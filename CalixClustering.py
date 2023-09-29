@@ -5,6 +5,7 @@ import umap
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.cluster import KMeans
 
 def import_csv_and_craft(csv_file_directory,
                          csv_file_name,
@@ -209,3 +210,38 @@ def create_umap_scatter(umap_cluster_dataframe,
         plt.scatter(x, y, color=color, alpha=opacity, marker=marker_type)
 
     return                             
+
+def kmeans_umap_plot(umap_cluster_dataframe,
+                     n_clusters,
+                     analysis_filename=None):
+    """
+    Perform k-means clustering on UMAP results and plot the clusters.
+    
+    Parameters:
+    - df : pandas DataFrame
+        DataFrame containing 'X' and 'Y' columns from UMAP.
+    - n_clusters : int
+        Number of clusters for k-means clustering.
+        
+    Returns:
+    - None (plots the scatterplot)
+    """
+    
+    # Extract 'X' and 'Y' for clustering
+    data_to_cluster = umap_cluster_dataframe[['X', 'Y']].values
+    
+    # Perform k-means clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(data_to_cluster)
+    
+    # Add cluster labels to original DataFrame and save for analysis
+    umap_cluster_dataframe['cluster'] = kmeans.labels_
+    # Export file for analysis if appropriate
+    if analysis_filename is not None:
+        umap_cluster_dataframe.to_csv(analysis_filename)
+
+    # Plotting
+    plt.figure(figsize=(10,8))
+    sns.scatterplot(x='X', y='Y', hue='cluster', data=umap_cluster_dataframe, palette='viridis', s=60, edgecolor=None, alpha=0.7)
+    plt.title(f'UMAP Clustering with k={n_clusters}')
+
+    return
