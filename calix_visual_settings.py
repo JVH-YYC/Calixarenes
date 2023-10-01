@@ -11,7 +11,7 @@ calixarene_publication_cluster_dict = {'target_column_list': ['Label_0',
                                          'data_column_list': ['3-10',],
                                          'data_mode': 'range',
                                          'csv_file_directory': './ClusterData/',
-                                         'csv_file_name': 'Log data avg per calix.csv'}
+                                         'csv_file_name': 'Log data excluding non-binders.csv'}
 
 calixarene_publication_umap_scatter_dict = {'plot_width': 3.2,
                                             'plot_height': 3.2,

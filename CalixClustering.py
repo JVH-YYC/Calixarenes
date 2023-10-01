@@ -235,6 +235,8 @@ def kmeans_umap_plot(umap_cluster_dataframe,
     
     # Add cluster labels to original DataFrame and save for analysis
     umap_cluster_dataframe['cluster'] = kmeans.labels_
+    umap_cluster_dataframe = umap_cluster_dataframe.sort_values(by='cluster')
+    
     # Export file for analysis if appropriate
     if analysis_filename is not None:
         umap_cluster_dataframe.to_csv(analysis_filename)
