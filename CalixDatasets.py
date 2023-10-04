@@ -8,7 +8,7 @@ from sklearn import svm
 from sklearn.ensemble import RandomForestRegressor as RFR 
 from Featurization import CalixFeatures as CF
 
-def create_efcp_dictionary(calixarene_csv_folder,
+def create_ecfp_dictionary(calixarene_csv_folder,
                            calixarene_csv_file,
                            target_columns,
                            target_columns_per_example):
@@ -40,12 +40,12 @@ def create_efcp_dictionary(calixarene_csv_folder,
         if row['Host'] not in calixarene_dict:
             if target_columns_per_example == 'all':
                 calixarene_dict[row['Host']] = {'SMILES': row['SMILES'],
-                                                'ECFP': CF.create_efcp6_fingerprint(row['SMILES']),
-                                                'Target_Val': row[target_columns].apply(tuple, axis=1)}
+                                                'ECFP': CF.create_ecfp6_fingerprint(row['SMILES']),
+                                                'Target_Val': tuple(row[target_columns])}
             elif target_columns_per_example == 'each':
-                for specific_column in target_columns:
-                    calixarene_dict[row['Host']] = {'SMILES': row['SMILES'],
-                                                    'ECFP': CF.create_efcp6_fingerprint(row['SMILES']),
+                for targ_no, specific_column in enumerate(target_columns):
+                    calixarene_dict[row['Host'] + str('_') + str(targ_no)] = {'SMILES': row['SMILES'],
+                                                    'ECFP': CF.create_ecfp6_fingerprint(row['SMILES']),
                                                     'Target_Val': row[specific_column],
                                                     'Target': specific_column}
     
