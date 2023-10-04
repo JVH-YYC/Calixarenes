@@ -1,7 +1,7 @@
 """
 Benchmark ML scripts for calixarene evaluations
 """
-
+import random
 import sklearn as skl
 import pandas as pd
 from sklearn import svm
@@ -51,4 +51,63 @@ def create_ecfp_dictionary(calixarene_csv_folder,
     
     return calixarene_dict
 
+def split_calix_dataset(calixarene_dict,
+                        split_method,
+                        train_fraction,
+                        test_fraction):
+    """
+    A function to split the calixarene benchmark dataset created by
+    create_ecfp_dictionary into training, validation, and test sets.
+    
+    The split can occur 2 different ways:
+        'by_point': in this case all points are treated eqally and split by random shuffle
+        'by_host': in this case, all points with a given host are in either the train, test, or validation set"""
 
+    # Create a dictionary to hold the split data
+    calixarene_split_dict = {}
+    calixarene_split_dict['train'] = {}
+    calixarene_split_dict['validation'] = {}
+    calixarene_split_dict['test'] = {}
+
+
+    # Split the data by point
+    if split_method == 'by_point':
+        #Shuffle list of keys
+        key_list = list(calixarene_dict.keys())
+        random.shuffle(key_list)
+
+        for specific_key in key_list:
+            # Check if the training set is full
+            if len(calixarene_split_dict['train']) < train_fraction * len(calixarene_dict):
+                calixarene_split_dict['train'][specific_key] = calixarene_dict[specific_key]
+            # Check if the validation set is full
+            elif (len(calixarene_split_dict['train']) + len(calixarene_split_dict['test'])) < (train_fraction + test_fraction) * len(calixarene_dict):
+                calixarene_split_dict['test'][specific_key] = calixarene_dict[specific_key]
+            # If neither of the above are true, then the validation set is filled
+            else:
+                calixarene_split_dict['validation'][specific_key] = calixarene_dict[specific_key]
+
+    # Split the data by host
+    elif split_method == 'by_host':
+        # Create a set of unique hosts
+        calix_host_list = []
+        for calix in calixarene_dict:
+            if calix.split('_')[0] not in calix_host_list:
+                calix_host_list.append(calix.split('_')[0])
+        random.shuffle(calix_host_list)
+
+        # Split hosts into training, validation, and test sets
+        train_host_set = set(calix_host_list[:int(train_fraction * len(calix_host_list))])
+        test_host_set = set(calix_host_list[int(train_fraction * len(calix_host_list)):int((train_fraction + test_fraction) * len(calix_host_list))])
+        validation_host_set = set(calix_host_list[int((train_fraction + test_fraction) * len(calix_host_list)):])
+
+        # Loop back through dictionary, and now use the host set to split the data
+        for calix in calixarene_dict:
+            if calix.split('_')[0] in train_host_set:
+                calixarene_split_dict['train'][calix] = calixarene_dict[calix]
+            elif calix.split('_')[0] in validation_host_set:
+                calixarene_split_dict['validation'][calix] = calixarene_dict[calix]
+            elif calix.split('_')[0] in test_host_set:
+                calixarene_split_dict['test'][calix] = calixarene_dict[calix]
+    
+    return calixarene_split_dict
