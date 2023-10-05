@@ -113,6 +113,92 @@ def split_calix_dataset(calixarene_dict,
     
     return calixarene_split_dict
 
+def cross_validation_split_calix_dataset(calixarene_dict,
+                                         split_method,
+                                         train_fraction,
+                                         test_fraction,
+                                         num_folds):
+    """
+    A function to split the calixarene benchmark dataset created by
+    create_ecfp_dictionary into training, validation, and test sets,
+    and cross_fold them with num_folds.
+    
+    The split can occur 2 different ways:
+        'by_point': in this case all points are treated eqally and split by random shuffle
+        'by_host': in this case, all points with a given host are in either the train, test, or validation set"""
+
+    # Create a dictionary to hold the split data
+    calixarene_cv_dict = {}
+    for count in range(num_folds):
+        calixarene_cv_dict['CV' + str(count)] = {}
+        calixarene_cv_dict['CV' + str(count)]['train'] = {}
+        calixarene_cv_dict['CV' + str(count)]['validation'] = {}
+        calixarene_cv_dict['CV' + str(count)]['test'] = {}
+
+    # Split the data by point
+    if split_method == 'by_point':
+        #Shuffle list of keys
+        key_list = list(calixarene_dict.keys())
+        random.shuffle(key_list)
+
+        # Determine size for each fold
+        fold_size = len(key_list) // num_folds
+
+        # Create 'n_splits' folds
+        folds = [key_list[i * fold_size:(i + 1) * fold_size] for i in range(num_folds)]
+
+        # Allocate remaining keys to the last fold, if any
+        if len(key_list) % num_folds != 0:
+            folds[-1].extend(key_list[num_folds * fold_size:])
+
+        for i in range(num_folds):
+            target_dict_key = 'CV' + str(i)
+            validation_keys = folds[i]
+            test_keys = folds[(i + 1) % num_folds]  # Take the next fold in a circular manner
+            train_keys = [key for j, fold in enumerate(folds) if j != i and j != (i + 1) % num_folds for key in fold]
+
+            calixarene_cv_dict[target_dict_key]['train'] = {key: calixarene_dict[key] for key in train_keys}
+            calixarene_cv_dict[target_dict_key]['validation'] = {key: calixarene_dict[key] for key in validation_keys}
+            calixarene_cv_dict[target_dict_key]['test'] = {key: calixarene_dict[key] for key in test_keys}
+
+    # Split the data by host
+    elif split_method == 'by_host':
+        # Create a set of unique hosts
+        calix_host_set = {calix.split('_')[0] for calix in calixarene_dict}
+        calix_host_list = list(calix_host_set)
+        random.shuffle(calix_host_list)
+
+        # Determine size for each fold of hosts
+        fold_size = len(calix_host_list) // num_folds
+
+        # Create 'num_folds' folds of hosts
+        host_folds = [calix_host_list[i * fold_size:(i + 1) * fold_size] for i in range(num_folds)]
+        if len(calix_host_list) % num_folds != 0:
+            host_folds[-1].extend(calix_host_list[num_folds * fold_size:])
+
+        # Create a dictionary to hold the cross-validation split data
+        calixarene_cv_dict = {}
+        for i in range(num_folds):
+            target_dict_key = 'CV' + str(i)
+            calixarene_cv_dict[target_dict_key] = {'train': {}, 'validation': {}, 'test': {}}
+
+            validation_host_set = set(host_folds[i])
+            test_host_set = set(host_folds[(i + 1) % num_folds])
+            train_host_set = calix_host_set - validation_host_set - test_host_set
+
+            for calix, value in calixarene_dict.items():
+                host = calix.split('_')[0]
+                if host in train_host_set:
+                    calixarene_cv_dict[target_dict_key]['train'][calix] = value
+                elif host in validation_host_set:
+                    calixarene_cv_dict[target_dict_key]['validation'][calix] = value
+                elif host in test_host_set:
+                    calixarene_cv_dict[target_dict_key]['test'][calix] = value
+    
+    return calixarene_cv_dict
+    
+
+
 def organize_random_forest_input(split_calix_dataset,
                                  dataset_target_type,
                                  ordered_feature_list,

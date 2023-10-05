@@ -63,11 +63,11 @@ def perform_grid_search(rfi,
                         save_pickle_file=False):
     # Define the hyperparameters for grid search
     param_grid = {
-        'n_estimators': [10, 50, 100, 500, 1000],
+        'n_estimators': [10, 25, 50, 100, 250,],
         'max_depth': [None, 10, 50],
         'min_samples_split': [2, 5, 10],
         'min_samples_leaf': [1, 2, 4],
-        'bootstrap': [True, False]
+        'bootstrap': [True,]
     }
 
     # Initialize the RandomForestRegressor
@@ -140,7 +140,30 @@ rfi = create_single_split_ECFP_dataset('Featurization/',
                                        0.1,
                                        CSS.peptide_one_hot_encoding)
 
+td = CSD.create_ecfp_dictionary(calixarene_csv_folder='Featurization/',
+                                calixarene_csv_file='calix smiles absolute.csv',
+                                target_columns=['H3K4me1',
+                                                'H3K4me2'],
+                                                # 'H3K4me3',
+                                                # 'H3R2me2s',
+                                                # 'H3R2me2a',
+                                                # 'H3K9me3',
+                                                # 'H3K4ac'],
+                                target_columns_per_example='each')
+
+cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
+                                                 split_method='by_host',
+                                                 train_fraction=0.8,
+                                                 test_fraction=0.1,
+                                                 num_folds=10)
+
 # Usage:
-best_params = perform_grid_search(rfi, plot_best_model=True)
+for entry in range(10):
+    curr_dict = cv_sd['CV' + str(entry)]
+    rfi = CSD.organize_random_forest_input(split_calix_dataset=curr_dict,
+                                           dataset_target_type='each',
+                                           ordered_feature_list=['ECFP'],
+                                           peptide_one_hot_encoding=CSS.peptide_one_hot_encoding)
+    best_params = perform_grid_search(rfi, plot_best_model=True)
 
 
