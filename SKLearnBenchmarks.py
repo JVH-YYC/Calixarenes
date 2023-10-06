@@ -5,6 +5,7 @@ Random Forest and SVM using ECFP6 fingerprints"""
 import sklearn as skl
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVR
+from sklearn.multioutput import MultiOutputRegressor
 import Featurization.CalixSKLDatasets as CSD
 import Featurization.calix_standard_settings as CSS
 from sklearn.model_selection import GridSearchCV
@@ -142,16 +143,25 @@ def perform_rf_grid_search(rfi,
 def perform_svm_grid_search(svm_data,
                         plot_best_model=False,
                         save_pickle_file=False):
-    # Define the hyperparameters for grid search
-    param_grid = {
-    'C': [0.1, 1, 10, 100, 1000],
-    'kernel': ['rbf',],
-    'gamma': ['scale', 'auto', 0.1, 1, 10],
-    'epsilon': [0.1, 0.2, 0.5, 1, 2, 5]}
     
-    # Initialize the Support Vector Regressor
-    svr = SVR()
-
+    # Initialize the Support Vector Regressor and check for multiple outputs
+    if svm_data['train']['target'].shape[1] > 1:
+        svr = MultiOutputRegressor(SVR())
+        # Define the hyperparameters for grid search
+        param_grid = {
+        'estimator__C': [0.1, 1, 10, 100, 1000],
+        'estimator__kernel': ['rbf',],
+        'estimator__gamma': ['scale', 'auto', 0.1, 1, 10],
+        'estimator__epsilon': [0.1, 0.2, 0.5, 1, 2, 5]}
+    else:
+        svr = SVR()
+        # Define the hyperparameters for grid search
+        param_grid = {
+        'C': [0.1, 1, 10, 100, 1000],
+        'kernel': ['rbf',],
+        'gamma': ['scale', 'auto', 0.1, 1, 10],
+        'epsilon': [0.1, 0.2, 0.5, 1, 2, 5]}
+    
     # Initialize GridSearchCV
     grid_search = GridSearchCV(estimator=svr, param_grid=param_grid, 
                                scoring='neg_mean_squared_error', 
@@ -220,31 +230,31 @@ def perform_svm_grid_search(svm_data,
     return grid_search.best_params_
 
 
-rfi = create_single_split_ECFP_dataset('Featurization/',
-                                       'calix smiles absolute.csv',
-                                       ['H3K4me1',
-                                        'H3K4me2',
-                                        'H3K4me3',
-                                        'H3R2me2s',
-                                        'H3R2me2a',
-                                        'H3K9me3',
-                                        'H3K4ac'],
-                                       'each',
-                                       'by_point',
-                                       0.8,
-                                       0.1,
-                                       CSS.peptide_one_hot_encoding)
+# rfi = create_single_split_ECFP_dataset('Featurization/',
+#                                        'calix smiles absolute.csv',
+#                                        ['H3K4me1',
+#                                         'H3K4me2',
+#                                         'H3K4me3',
+#                                         'H3R2me2s',
+#                                         'H3R2me2a',
+#                                         'H3K9me3',
+#                                         'H3K4ac'],
+#                                        'each',
+#                                        'by_point',
+#                                        0.8,
+#                                        0.1,
+#                                        CSS.peptide_one_hot_encoding)
 
 td = CSD.create_ecfp_dictionary(calixarene_csv_folder='Featurization/',
-                                calixarene_csv_file='calix smiles absolute.csv',
+                                calixarene_csv_file='calix smiles diff.csv',
                                 target_columns=['H3K4me1',
-                                                'H3K4me2'],
-                                                # 'H3K4me3',
-                                                # 'H3R2me2s',
-                                                # 'H3R2me2a',
-                                                # 'H3K9me3',
-                                                # 'H3K4ac'],
-                                target_columns_per_example='each')
+                                                'H3K4me2',
+                                                'H3K4me3',
+                                                'H3R2me2s',
+                                                'H3R2me2a',
+                                                'H3K9me3',
+                                                'H3K4ac'],
+                                target_columns_per_example='all')
 
 cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
                                                  split_method='by_host',
@@ -256,9 +266,9 @@ cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
 for entry in range(10):
     curr_dict = cv_sd['CV' + str(entry)]
     rfi = CSD.organize_random_forest_input(split_calix_dataset=curr_dict,
-                                           dataset_target_type='each',
+                                           dataset_target_type='all',
                                            ordered_feature_list=['ECFP'],
                                            peptide_one_hot_encoding=CSS.peptide_one_hot_encoding)
-    best_params = perform_rf_grid_search(rfi, plot_best_model=True)
+    best_params = perform_svm_grid_search(rfi, plot_best_model=True)
 
 
