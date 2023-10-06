@@ -57,8 +57,7 @@ def train_single_random_forest(rfi):
 
     return mse
 
-
-def perform_grid_search(rfi,
+def perform_rf_grid_search(rfi,
                         plot_best_model=False,
                         save_pickle_file=False):
     # Define the hyperparameters for grid search
@@ -76,7 +75,7 @@ def perform_grid_search(rfi,
     # Initialize GridSearchCV
     grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, 
                                scoring='neg_mean_squared_error', 
-                               cv=3, 
+                               cv=10, 
                                verbose=1, 
                                n_jobs=-1)
 
@@ -116,6 +115,21 @@ def perform_grid_search(rfi,
             plt.figure(figsize=(10, 6))
             plt.scatter(rfi['train']['target'], predictions_train, color='blue', label='Train', alpha=0.5)
             plt.scatter(rfi['test']['target'], predictions_test, color='orange', label='Test', alpha=0.5)
+            
+            # Draw the line of x=y
+            # Get the current limits of the plot
+            xlim = plt.gca().get_xlim()
+            ylim = plt.gca().get_ylim()
+
+            # Determine the min and max values for x=y line using the limits
+            min_val = min(xlim[0], ylim[0])
+            max_val = max(xlim[1], ylim[1])            
+            plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='x=y line')
+
+            # Setting the same scale for both axes
+            plt.xlim(min_val, max_val)
+            plt.ylim(min_val, max_val)
+            
             plt.xlabel('Actual Values')
             plt.ylabel('Predicted Values')
             plt.title('Actual vs. Predicted Values for Best Model')
@@ -124,6 +138,87 @@ def perform_grid_search(rfi,
             plt.show()
 
     return grid_search.best_params_
+
+def perform_svm_grid_search(svm_data,
+                        plot_best_model=False,
+                        save_pickle_file=False):
+    # Define the hyperparameters for grid search
+    param_grid = {
+    'C': [0.1, 1, 10, 100, 1000],
+    'kernel': ['rbf',],
+    'gamma': ['scale', 'auto', 0.1, 1, 10],
+    'epsilon': [0.1, 0.2, 0.5, 1, 2, 5]}
+    
+    # Initialize the Support Vector Regressor
+    svr = SVR()
+
+    # Initialize GridSearchCV
+    grid_search = GridSearchCV(estimator=svr, param_grid=param_grid, 
+                               scoring='neg_mean_squared_error', 
+                               cv=10, 
+                               verbose=1, 
+                               n_jobs=-1)
+
+    # Fit the model using the 'train' split
+    grid_search.fit(svm_data['train']['features'], svm_data['train']['target'])
+
+    # Predict on the 'test' split and compute MSE
+    best_svm = grid_search.best_estimator_
+    predictions_test = best_svm.predict(svm_data['test']['features'])
+    test_mse = mean_squared_error(svm_data['test']['target'], predictions_test)
+
+    # Record the results
+    results = pd.DataFrame(grid_search.cv_results_)
+    results['test_mse'] = test_mse
+
+    # Sort the results by test score
+    results = results.sort_values(by='mean_test_score', ascending=False)
+
+    # Save the results to a CSV file
+    results.to_csv('grid_search_results_sorted.csv', index=False)
+
+   # Plot the best model's performance if plot_best_model is True
+    if plot_best_model or save_pickle_file:
+        predictions_train = best_svm.predict(svm_data['train']['features'])
+
+        # Create list of tuples for train and test datasets
+        train_data = list(zip(svm_data['train']['target'], predictions_train))
+        test_data = list(zip(svm_data['test']['target'], predictions_test))
+        
+        # Save data to a pickle file if save_pickle_file is True
+        if save_pickle_file:
+            with open('scatter_plot_data.pkl', 'wb') as f:
+                pickle.dump({'train': train_data, 'test': test_data}, f)
+        
+        # Plot if plot_best_model is True
+        if plot_best_model:
+            plt.figure(figsize=(10, 6))
+            plt.scatter(svm_data['train']['target'], predictions_train, color='blue', label='Train', alpha=0.5)
+            plt.scatter(svm_data['test']['target'], predictions_test, color='orange', label='Test', alpha=0.5)
+            
+            # Draw the line of x=y
+            # Get the current limits of the plot
+            xlim = plt.gca().get_xlim()
+            ylim = plt.gca().get_ylim()
+
+            # Determine the min and max values for x=y line using the limits
+            min_val = min(xlim[0], ylim[0])
+            max_val = max(xlim[1], ylim[1])            
+            plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='x=y line')
+
+            # Setting the same scale for both axes
+            plt.xlim(min_val, max_val)
+            plt.ylim(min_val, max_val)
+            
+            plt.xlabel('Actual Values')
+            plt.ylabel('Predicted Values')
+            plt.title('Actual vs. Predicted Values for Best Model')
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+    return grid_search.best_params_
+
 
 rfi = create_single_split_ECFP_dataset('Featurization/',
                                        'calix smiles absolute.csv',
@@ -164,6 +259,6 @@ for entry in range(10):
                                            dataset_target_type='each',
                                            ordered_feature_list=['ECFP'],
                                            peptide_one_hot_encoding=CSS.peptide_one_hot_encoding)
-    best_params = perform_grid_search(rfi, plot_best_model=True)
+    best_params = perform_rf_grid_search(rfi, plot_best_model=True)
 
 
