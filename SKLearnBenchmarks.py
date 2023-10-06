@@ -246,7 +246,7 @@ def perform_svm_grid_search(svm_data,
 #                                        CSS.peptide_one_hot_encoding)
 
 td = CSD.create_ecfp_dictionary(calixarene_csv_folder='Featurization/',
-                                calixarene_csv_file='calix smiles diff.csv',
+                                calixarene_csv_file='calix smiles rank.csv',
                                 target_columns=['H3K4me1',
                                                 'H3K4me2',
                                                 'H3K4me3',
