@@ -197,8 +197,6 @@ def cross_validation_split_calix_dataset(calixarene_dict,
     
     return calixarene_cv_dict
     
-
-
 def organize_random_forest_input(split_calix_dataset,
                                  dataset_target_type,
                                  ordered_feature_list,
@@ -256,3 +254,4 @@ def organize_random_forest_input(split_calix_dataset,
             calixarene_rf_dict[dataset_split]['target'] = np.array(full_sample_target_list)
             
     return calixarene_rf_dict
+
