@@ -132,16 +132,21 @@ def perform_rf_grid_search(rfi,
    # Plot the best model's performance if plot_best_model is True
     if plot_best_model or save_pickle_file:
         if mode == 'regression':
-            predictions_train = best_rf.predict(rfi['train']['features'])
+            train_combined = best_rf.predict(rfi['train']['features'])
+            test_combined = predictions_test
         elif mode == 'classification':
             predictions_train = best_rf.predict_proba(rfi['train']['features'])
-            if len(predictions_train) > 2:
+            if type(predictions_train)==list:
                 predictions_train = [prob[:, 1] for prob in predictions_train]
                 train_combined = np.column_stack(predictions_train)
+            else:
+                train_combined = predictions_train[:, 1]
             predictions_test = best_rf.predict_proba(rfi['test']['features'])
-            if len(predictions_test) > 2:
+            if type(predictions_test)==list:
                 predictions_test = [prob[:, 1] for prob in predictions_test]
                 test_combined = np.column_stack(predictions_test)
+            else:
+                test_combined = predictions_test[:, 1]
         # Create list of tuples for train and test datasets
         train_data = list(zip(rfi['train']['target'], train_combined))
         test_data = list(zip(rfi['test']['target'], test_combined))
@@ -154,8 +159,8 @@ def perform_rf_grid_search(rfi,
         # Plot if plot_best_model is True
         if plot_best_model:
             plt.figure(figsize=(10, 6))
-            plt.scatter(rfi['train']['target'], predictions_train, color='blue', label='Train', alpha=0.5)
-            plt.scatter(rfi['test']['target'], predictions_test, color='orange', label='Test', alpha=0.5)
+            plt.scatter(rfi['train']['target'], train_combined, color='blue', label='Train', alpha=0.5)
+            plt.scatter(rfi['test']['target'], test_combined, color='orange', label='Test', alpha=0.5)
             
             # Draw the line of x=y
             # Get the current limits of the plot
@@ -187,6 +192,7 @@ def perform_svm_grid_search(svm_data,
                         pickle_file_name='placeholder'):
     
     # Initialize the Support Vector Regressor and check for multiple outputs
+    multi_class = False
     if len(svm_data['train']['target'].shape) > 1:
         # Define the hyperparameters for grid search
         param_grid = {
@@ -199,6 +205,7 @@ def perform_svm_grid_search(svm_data,
 
         elif mode == 'classification':
             svm = MultiOutputClassifier(SVC())
+            multi_class = True
     else:
         # Define the hyperparameters for grid search
         param_grid = {
@@ -219,7 +226,7 @@ def perform_svm_grid_search(svm_data,
 
     # Fit the model using the 'train' split
     grid_search.fit(svm_data['train']['features'], svm_data['train']['target'])
-
+    print(svm_data['train']['target'])
     # Predict on the 'test' split and compute MSE
     best_svm = grid_search.best_estimator_
     predictions_test = best_svm.predict(svm_data['test']['features'])
@@ -235,11 +242,23 @@ def perform_svm_grid_search(svm_data,
 
    # Plot the best model's performance if plot_best_model is True
     if plot_best_model or save_pickle_file:
-        predictions_train = best_svm.predict(svm_data['train']['features'])
+        if mode == 'regression':
+            train_combined = best_svm.predict(svm_data['train']['features'])
+            test_combined = predictions_test
+        elif mode == 'classification':
+            if multi_class == False:
+                train_combined = best_svm.decision_function(svm_data['train']['features'])
+                test_combined = best_svm.decision_function(svm_data['test']['features'])
+            else:
+                train_scores = [estimator.decision_function(svm_data['train']['features']) for estimator in best_svm.estimators_]
+                train_combined = np.column_stack(train_scores)
+
+                test_scores = [estimator.decision_function(svm_data['test']['features']) for estimator in best_svm.estimators_]
+                test_combined = np.column_stack(test_scores)
 
         # Create list of tuples for train and test datasets
-        train_data = list(zip(svm_data['train']['target'], predictions_train))
-        test_data = list(zip(svm_data['test']['target'], predictions_test))
+        train_data = list(zip(svm_data['train']['target'], train_combined))
+        test_data = list(zip(svm_data['test']['target'], test_combined))
         
         # Save data to a pickle file if save_pickle_file is True
         if save_pickle_file:
@@ -249,8 +268,8 @@ def perform_svm_grid_search(svm_data,
         # Plot if plot_best_model is True
         if plot_best_model:
             plt.figure(figsize=(10, 6))
-            plt.scatter(svm_data['train']['target'], predictions_train, color='blue', label='Train', alpha=0.5)
-            plt.scatter(svm_data['test']['target'], predictions_test, color='orange', label='Test', alpha=0.5)
+            plt.scatter(svm_data['train']['target'], train_combined, color='blue', label='Train', alpha=0.5)
+            plt.scatter(svm_data['test']['target'], test_combined, color='orange', label='Test', alpha=0.5)
             
             # Draw the line of x=y
             # Get the current limits of the plot
@@ -292,7 +311,7 @@ def perform_svm_grid_search(svm_data,
 #                                        CSS.peptide_one_hot_encoding)
 
 td = CSD.create_ecfp_dictionary(calixarene_csv_folder='Featurization/',
-                                calixarene_csv_file='Categorical prediction data.csv',
+                                calixarene_csv_file='calix smiles absolute.csv',
                                 target_columns=['H3K4me1',
                                                 'H3K4me2',
                                                 'H3K4me3',
@@ -301,7 +320,7 @@ td = CSD.create_ecfp_dictionary(calixarene_csv_folder='Featurization/',
                                                 'H3K9me3',
                                                 'H3K4ac',
                                                 'H3K4'],
-                                target_columns_per_example='each')
+                                target_columns_per_example='all')
 
 cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
                                                  split_method='by_host',
@@ -313,12 +332,12 @@ cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
 for entry in range(10):
     curr_dict = cv_sd['CV' + str(entry)]
     rfi = CSD.organize_random_forest_input(split_calix_dataset=curr_dict,
-                                           dataset_target_type='each',
+                                           dataset_target_type='all',
                                            ordered_feature_list=['ECFP'],
                                            peptide_one_hot_encoding=CSS.peptide_one_hot_encoding)
-    pickle_file_name = 'CV' + str(entry) + '_test_train_data.pkl'
-    best_params = perform_rf_grid_search(rfi,
-                                          mode = 'classification',
+    pickle_file_name = 'CV' + str(entry) + 'regression_svm_byhost_all_test_train_data.pkl'
+    best_params = perform_svm_grid_search(rfi,
+                                          mode = 'regression',
                                           plot_best_model=True,
                                           save_pickle_file=True,
                                           pickle_file_name=pickle_file_name)
