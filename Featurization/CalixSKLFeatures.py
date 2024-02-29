@@ -19,6 +19,24 @@ def create_ecfp6_fingerprint(smiles_string):
     
     return ecfp
 
+def create_double_ecpf6_fingerprint(smiles_tuple):
+    """
+    Takes a tuple with two SMILES strings and returns a concatenated ECFP6 fingerprint
+    """
+    
+    mol1 = Chem.MolFromSmiles(smiles_tuple[0])
+    mol2 = Chem.MolFromSmiles(smiles_tuple[1])
+    
+    fp1 = AllChem.GetMorganFingerprintAsBitVect(mol1, radius=3)
+    fp2 = AllChem.GetMorganFingerprintAsBitVect(mol2, radius=3)
+    
+    ecfp1 = np.array(fp1)
+    ecfp2 = np.array(fp2)
+    
+    double_ecfp = np.concatenate((ecfp1, ecfp2))
+    
+    return double_ecfp
+
 
 
 

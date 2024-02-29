@@ -1,7 +1,10 @@
 """
 Benchmark ML scripts for calixarene evaluations
 """
+import os
+os.chdir('/Users/jeffreyvanhumbeck/Documents/GitHub/Calixarenes/')
 import random
+import itertools
 import numpy as np
 import sklearn as skl
 import pandas as pd
@@ -51,6 +54,39 @@ def create_ecfp_dictionary(calixarene_csv_folder,
                                                     'Target': specific_column}
     
     return calixarene_dict
+
+def create_relative_ecfp_dictionary(calixarene_csv_folder,
+                                    calixarene_csv_file,
+                                    target_columns,
+                                    target_columns_per_example):
+    """
+    A function that reads the data .csv, and then creates a dictionary
+    comparing each unique pair of calixarenes, and records the difference
+    between the two dataframe values.
+    """
+    # Read in the .csv file
+    calixarene_df = pd.read_csv(calixarene_csv_folder + calixarene_csv_file)
+
+    calixarene_comparison_dict = {}
+
+    # Iterate over all combinations of two different hosts
+    for (idx1, row1), (idx2, row2) in itertools.combinations(calixarene_df.iterrows(), 2):
+        host_pair = (row1['Host'], row2['Host'])
+        
+        if target_columns_per_example == 'each':
+            for target in target_columns:
+                key = host_pair + (target,)
+                calixarene_comparison_dict[host_pair] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+                                                         'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES'])),
+                                                         'Target_Val': row1[target] - row2[target],
+                                                         'Target': target}
+        elif target_columns_per_example == 'all':
+            differences = tuple(row1[target] - row2[target] for target in target_columns)
+            calixarene_comparison_dict[host_pair] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+                                                     'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES'])),
+                                                     'Target_Val': differences}
+
+    return calixarene_comparison_dict
 
 def split_calix_dataset(calixarene_dict,
                         split_method,
