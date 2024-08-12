@@ -152,21 +152,21 @@ def labelled_example_generator(calix_1,
     return calix_1_frame
 
 def fully_enumerate_set(binding_file,
-                        binding_file_directory,
-                        prefix_list):
+                           csv_file_directory,
+                           prefix_list):
     """
     Takes a .csv with adsorption values, and a prefix list of calixarene names
-    The prefix list **has already had the test set removed**
-    Creates a half-enumerated list of inhibitor 1 / inhibitor 2 combinations
+    The prefix list **has already had the validation set removed**
+    Creates a half-enumerated list of calix 1 / calix 2 / peptide combinations
     Only 'half-enumerated' because is ('CP2', 'AP3') is an entry, then ('AP3', 'CP2')
-    will be excluded (prevents leakage between training/validation set)
+    will be excluded (prevents leakage between training/test set)
     
 
     Parameters
     ----------
     binding_file : string
         Name of .csv file that contains binding information
-    binding_file_directory : string
+    csv_file_directory : string
         Name of directory that contains binding file
     prefix_list : list of strings
         List of names of calixarenes to be used in test/training set
@@ -176,34 +176,30 @@ def fully_enumerate_set(binding_file,
     Three lists:
     
     calix_pairs : an ordered list of [(calix_1, calix_2),] combinations
-    value_tuple_list : an ordered list of tuples, where each entry is
-                       [((calix_1 ADS_VAL, calix_1 UNCERT, calix_1, ADD/DUAL),
-                         (calix_2 ADS_VAL, calix_2 UNCERT, calix_1 ADD/DUAL))]
+    peptide_list : an ordered list of which peptide is being considered
+    log_pair_values : an ordered list of the relative adsorption affinities
 
     """
     
-    csv_path = Path('.', binding_file_directory)
+    csv_path = Path('.', csv_file_directory)
     
-    load_frame = pd.read_csv(csv_path / binding_file,
+    adsorption_frame = pd.read_csv(csv_path / binding_file,
                                    header=0,
                                    index_col=0)
 
-    adsorption_frame = load_frame.where(pd.notnull(load_frame), None)
     
     calix_pairs = []
-    value_tuple_list = []
+    peptide_list = []
+    log_pair_values = []
     
-    for entry in range(len(prefix_list)):
-        for second_entry in range(len(prefix_list) - entry):
-            calix_pairs.append((prefix_list[entry], prefix_list[(entry + second_entry)]))
-            value_tuple_list.append(((adsorption_frame.at[prefix_list[entry], 'ADS_VAL'],
-                                     adsorption_frame.at[prefix_list[entry], 'UNCERT'],
-                                     adsorption_frame.at[prefix_list[entry], 'ADD_DUAL']),
-                                    (adsorption_frame.at[prefix_list[entry + second_entry], 'ADS_VAL'],
-                                     adsorption_frame.at[prefix_list[entry + second_entry], 'UNCERT'],
-                                     adsorption_frame.at[prefix_list[entry + second_entry], 'ADD_DUAL'])))
+    for peptide in list(adsorption_frame.columns):
+        for entry in range(len(prefix_list)):
+            for second_entry in range(len(prefix_list) - entry):
+                calix_pairs.append((prefix_list[entry], prefix_list[(entry + second_entry)]))
+                peptide_list.append(peptide)
+                log_pair_values.append(np.log((adsorption_frame.at[prefix_list[entry], peptide]) / (adsorption_frame.at[prefix_list[(entry + second_entry)], peptide])))
     
-    return calix_pairs, value_tuple_list
+    return calix_pairs, peptide_list, log_pair_values
 
 def key_to_tensor(inverse_flag,
                   calix_tuple,
@@ -248,12 +244,48 @@ def key_to_tensor(inverse_flag,
 
     return tensor
 
+def create_tensor_dict(calixarene_list, data_frame):
+    """
+    Takes a list of calixarenes, and creates a dictionary that has pytorch tensors for
+    each given calixarene. These will be called by the pytorch itemgetter during training,
+    rather than creating a fresh tensor for each example (old approach)
+    """
+    tensor_dict = {}
+
+    for entry in calixarene_list:
+        cal_1_aso = entry + '_1' + '_ASO'
+        cal_1_pos = entry + '_1' + '_POS'
+        cal_1_neg = entry + '_1' + '_NEG'
+        cal_1_pol = entry + '_1' + '_POL'
+
+        calix_1_frame = pd.DataFrame({
+            'x': data_frame['x'],
+            'y': data_frame['y'],
+            'z': data_frame['z'],
+            'ASO': data_frame[cal_1_aso],
+            'POS': data_frame[cal_1_pos],
+            'NEG': data_frame[cal_1_neg],
+            'POL': data_frame[cal_1_pol]})
+
+        key_dimension = int(np.rint(np.cbrt(calix_1_frame.shape[0])))
+        key_cols = calix_1_frame[['ASO', 'POS', 'NEG', 'POL']]
+        numpy_ar = key_cols.values
+        numpy_shaped = numpy_ar.reshape(key_dimension, key_dimension, key_dimension, 4)
+        numpy_moveax = np.moveaxis(numpy_shaped, 3, 0)
+        tensor = torch.from_numpy(numpy_moveax)
+        tensor = tensor.float()
+        tensor_dict[entry] = tensor
+
+    return tensor_dict
+
 def calculate_ads_w_error(value_tuple):
     """
     A function that takes an inhibitor value tuple and returns
     a predicted adsorption difference that includes experimental error
     If error was listed in paper, function call will return a (slightly) different
-    value each time
+    value each time.
+
+    Initial testing shows including error has no benefit - excluded in this version.
 
     Parameters
     ----------

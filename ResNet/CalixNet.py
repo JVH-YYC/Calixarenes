@@ -188,9 +188,11 @@ class FullAdsorptionDataset(Dataset):
                                                pq_file_directory)
         self.prefix_list = CDL.calixarene_list(self.molecule_frame,
                                                test_set)
-        self.calix_pairs, self.value_tuple_list = CDL.fully_enumerate_set(binding_file,
+        self.calix_pairs, self.peptide_list, self.log_val_list = CDL.fully_enumerate_set(binding_file,
                                                                      csv_file_directory,
                                                                      self.prefix_list)
+        self.tensor_dict = CDL.create_tensor_dict(self.prefix_list,
+                                                  self.molecule_frame)
 
     def __len__(self):
         return len(self.calix_pairs)
@@ -198,22 +200,15 @@ class FullAdsorptionDataset(Dataset):
     def __getitem__(self, idx):
     #Should return 3D data difference frame, adsorption difference
     #Use a random True/False flag to select either the forward or inverse problem randomly
-                    
-        sample_random = random.getrandbits(1)
-        
-        if sample_random == 0:
-            sample_tensor = CDL.key_to_tensor(False,
-                                               self.calix_pairs[idx],
-                                               self.molecule_frame)
-            sample_value = CDL.calculate_ads_w_error(self.value_tuple_list[idx])
 
-        elif sample_random == 1:
-            sample_tensor = CDL.key_to_tensor(True,
-                                               self.calix_pairs[idx],
-                                               self.molecule_frame)
-            sample_value = -1 * CDL.calculate_ads_w_error(self.value_tuple_list[idx])
-        
-        return sample_tensor, sample_value
+        calix_pairs = self.calix_pairs[idx]
+
+        first_tens = self.tensor_dict[calix_pairs[0]]
+        second_tens = self.tensor_dict[calix_pairs[1]]
+
+        sample_value = self.log_val_list[idx]
+
+        return first_tens, second_tens, sample_value
 
 
 def val_train_indices(dataset,
@@ -356,11 +351,13 @@ def train_network(network,
 
         for data in train_loader:
             #Gather input values
-            inputs, target_values = data
+            cal_tens1, cal_tens2, target_values = data
             target_values = target_values.view(-1, 1)
             
             #Send data to GPU
-            inputs = inputs.to('cuda')
+            cal_tens1 = cal_tens1.to('cuda')
+            cal_tens2 = cal_tens2.to('cuda')
+            inputs = cal_tens1 - cal_tens2
             target_values = target_values.to('cuda')
             
             #Set current gradients to zero
@@ -382,11 +379,14 @@ def train_network(network,
         
         total_val_loss = 0
         with torch.no_grad():
-            for inputs, target_values in val_loader:
+            for data in val_loader:
+                cal_tens1, cal_tens2, target_values = data
                 target_values = target_values.view(-1, 1)
-
+                
                 #Send data to GPU
-                inputs = inputs.to('cuda')
+                cal_tens1 = cal_tens1.to('cuda')
+                cal_tens2 = cal_tens2.to('cuda')
+                inputs = cal_tens1 - cal_tens2
                 target_values = target_values.to('cuda')
             
                 #Forward pass only
