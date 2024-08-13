@@ -14,13 +14,15 @@ import DataLoaders.CDKDataLoader as CDL
 
 pq_file_directory = 'PQFiles'
 pq_file_name = 'Alok_Thesis_Comb_10A.pq'
-csv_file_directory = 'ClusterData'
+csv_file_directory = 'CSVFiles'
 binding_file = 'Data excluding non-binders.csv'
-test_set = ['BH5', 'E9', 'F1', 'E2']
+one_hot_file = 'one_hot_short.csv'
+exclude_calix = ['BH5', 'E9', 'F1', 'E2', 'E5']
+test_set = ['AP3', 'BM1']
 output_name ='FirstTest'
-batch_size = 80
+batch_size = 85
 val_split = 0.1
-training_epochs = 300
+training_epochs = 1
 learning_rate = 0.003
 current_iteration = 0
 
@@ -28,6 +30,8 @@ CNN.cnn_work_flow(pq_file_directory,
                   pq_file_name,
                   csv_file_directory,
                   binding_file,
+                  one_hot_file,
+                  exclude_calix,
                   test_set,
                   output_name,
                   batch_size,

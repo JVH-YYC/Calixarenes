@@ -201,6 +201,50 @@ def fully_enumerate_set(binding_file,
     
     return calix_pairs, peptide_list, log_pair_values
 
+def enumerate_test_calix(binding_file,
+                         csv_file_directory,
+                         prefix_list,
+                         test_set):
+    """
+    A function that creates a set of calix_pairs, peptide_list, and log_pair_values with the following properties:
+    
+    It creates all combinations of calixarene pairs that involve *one* of the calixarene test set, and one of the training set
+
+    This is used to turn a relative adsorption prediction into an absolute one, by multiplying by the known value. No test vs test
+    combinations are included, as these predictions (while interesting) are impossible to convert back into absolute values, as in
+    theory the test set adsorption values are unknown.
+
+    Parameters
+    ----------
+    binding_file : string
+        Name of .csv file that contains binding information
+    csv_file_directory : string
+        Name of directory that contains binding file
+    prefix_list : list of strings
+        List of names of calixarenes to be used in training set
+    test_set : list of strings
+        List of names of calixarenes to be used in test set
+    """
+
+    csv_path = Path('.', csv_file_directory)
+
+    adsorption_frame = pd.read_csv(csv_path / binding_file,
+                                   header=0,
+                                   index_col=0)
+    
+    calix_pairs = []
+    peptide_list = []
+    log_pair_values = []
+
+    for peptide in list(adsorption_frame.columns):
+        for entry in range(len(prefix_list)):
+            for second_entry in range(len(test_set)):
+                calix_pairs.append((prefix_list[entry], test_set[second_entry]))
+                peptide_list.append(peptide)
+                log_pair_values.append(np.log((adsorption_frame.at[prefix_list[entry], peptide]) / (adsorption_frame.at[test_set[second_entry], peptide])))
+    
+    return calix_pairs, peptide_list, log_pair_values
+                                       
 def key_to_tensor(inverse_flag,
                   calix_tuple,
                   data_frame):

@@ -140,7 +140,7 @@ def ResNet18(input_channels):
                   input_channels)
 
         
-class FullAdsorptionDataset(Dataset):
+class RelativeAdsorptionDataset(Dataset):
     """ 
     Takes a .csv file with adsorption data
     Creates a fully enumerated data set via FullyEnumerateSet (returns lists of cdk_pair tuple + log_values)
@@ -154,6 +154,7 @@ class FullAdsorptionDataset(Dataset):
                  csv_file_directory,
                  binding_file,
                  one_hot_file,
+                 exclude_calix,
                  test_set,
                  training_batch_size):
         """
@@ -170,6 +171,11 @@ class FullAdsorptionDataset(Dataset):
             Name of directory holding  adsorption data .csv files
         binding_file : string
             Name of csv file holding adsorption data
+        one_hot_file : string
+            Name of csv file holding one-hot encoded peptide data
+        exclude_calix : list of strings
+            Names of calixarenes to be held out of all sets - necessary as more calixarenes were calculated and
+            included in .pq file than have good adsorption data
         test_set : list of strings
             Names of the calixarene files to be held out of the test/training set for validation
         training_batch_size : integer
@@ -186,16 +192,27 @@ class FullAdsorptionDataset(Dataset):
         self.binding_file = binding_file
         self.test_set = test_set
         self.training_batch_size = training_batch_size
-        
+        self.exclude_calix = exclude_calix
+                
         self.molecule_frame = CDL.coordinate_load(pq_file_name,
                                                pq_file_directory)
         self.prefix_list = CDL.calixarene_list(self.molecule_frame,
-                                               test_set)
+                                               test_set + exclude_calix)
         self.calix_pairs, self.peptide_list, self.log_val_list = CDL.fully_enumerate_set(binding_file,
                                                                      csv_file_directory,
                                                                      self.prefix_list)
+        
+        self.test_pairs, self.test_peptides, self.test_log_vals = CDL.enumerate_test_calix(binding_file,
+                                                                                           csv_file_directory,
+                                                                                           self.prefix_list,
+                                                                                           test_set)
+
         self.tensor_dict = CDL.create_tensor_dict(self.prefix_list,
                                                   self.molecule_frame)
+        
+        self.test_tensor_dict = CDL.create_tensor_dict(self.test_set + self.prefix_list,
+                                                       self.molecule_frame)
+        
         self.one_hot_tags = CDL.load_peptide_one_hot(csv_file_directory,
                                                      one_hot_file)
 
@@ -269,6 +286,7 @@ def train_network(network,
                   csv_file_directory,
                   binding_file,
                   one_hot_file,
+                  exclude_calix,
                   test_set,
                   output_name,
                   batch_size,
@@ -313,11 +331,12 @@ def train_network(network,
 
     """    
     
-    adsorption_data = FullAdsorptionDataset(pq_file_directory,
+    adsorption_data = RelativeAdsorptionDataset(pq_file_directory,
                                             pq_file_name,
                                             csv_file_directory,
                                             binding_file,
                                             one_hot_file,
+                                            exclude_calix,
                                             test_set,
                                             batch_size)
 
@@ -385,7 +404,7 @@ def train_network(network,
 
         print("Epoch {}, training_loss: {:.2f}, took: {:.2f}s".format(epoch+1, current_loss / num_batches, time.time() - epoch_time))
 
-        #At end of epoch, try test set on GPU
+        #At end of epoch, try val set on GPU
         
         total_val_loss = 0
         with torch.no_grad():
@@ -455,6 +474,10 @@ def train_network(network,
                                             '_val',
                                             save_string[:-3])
     
+    test_pred, test_act = single_test_pass(network,
+                                             adsorption_data,
+                                             save_string[:-3])
+    
     return training_log
 
 def cnn_work_flow(pq_file_directory,
@@ -462,6 +485,7 @@ def cnn_work_flow(pq_file_directory,
                   csv_file_directory,
                   binding_file,
                   one_hot_file,
+                  exclude_calix,
                   test_set,
                   output_name,
                   batch_size,
@@ -483,6 +507,11 @@ def cnn_work_flow(pq_file_directory,
         Name of directory holding one-hot encodings and adsorption data .csv files
     binding_file : string
         Name of csv file holding adsorption data
+    one_hot_file : string
+        Name of csv file holding one-hot encoded peptide data
+    exclude_calix : list of strings
+        List of calixarenes to be held out of all sets. This is necessary as more calixarenes were calculated and
+        included in .pq file than have good adsorption data
     test_set : list of strings
         List of calixarenes that are held out for validation
     output_name : string
@@ -514,6 +543,7 @@ def cnn_work_flow(pq_file_directory,
                                   csv_file_directory,
                                   binding_file,
                                   one_hot_file,
+                                  exclude_calix,
                                   test_set,
                                   output_name,
                                   batch_size,
@@ -687,19 +717,24 @@ def single_forward_pass(network,
     with torch.no_grad():
         final_predict_list = []
         final_actual_list = []
-        for inputs, labels in data_loader:
-            labels = labels.view(-1, 1)
-
+        for data in data_loader:
+            #Gather input values
+            cal_tens1, cal_tens2, peptide_tens, target_values = data
+            target_values = target_values.view(-1, 1)
+            
             #Send data to GPU
-            inputs = inputs.to('cuda')
-            labels = labels.to('cuda')
+            cal_tens1 = cal_tens1.to('cuda')
+            cal_tens2 = cal_tens2.to('cuda')
+            inputs = cal_tens1 - cal_tens2
+            peptide_tens = peptide_tens.to('cuda')
+            target_values = target_values.to('cuda')
         
             #Forward pass only
-            this_output = network(inputs)
+            this_output = network(inputs, peptide_tens)
             tensor_list = list(this_output.flatten())
             predict_list = [x.item() for x in tensor_list]
             final_predict_list = final_predict_list + predict_list
-            actual_tens = list(labels.flatten())
+            actual_tens = list(target_values.flatten())
             actual_list = [x.item() for x in actual_tens]
             final_actual_list = final_actual_list + actual_list
     
@@ -709,6 +744,50 @@ def single_forward_pass(network,
                   output_name)
     
     return final_predict_list, final_actual_list
+
+def single_test_pass(network,
+                     dataset_obj,
+                     output_name):
+    """
+    Takes a trained network and runs a forward pass on the test set
+
+    Has a slightly different structure, as the test set points cannot
+    be accessed by the __getitem__ function in the dataset object.
+
+    Must be called independently for safety.
+    """
+
+    with torch.no_grad():
+        final_predict_list = []
+        final_actual_list = []
+        for example in range(len(dataset_obj.test_pairs)):
+            cal_tens1 = dataset_obj.test_tensor_dict[dataset_obj.test_pairs[example][0]]
+            cal_tens2 = dataset_obj.test_tensor_dict[dataset_obj.test_pairs[example][1]]
+            peptide_tens = dataset_obj.one_hot_tags[dataset_obj.test_peptides[example]]
+            target_values = dataset_obj.test_log_vals[example]
+
+            cal_tens1 = cal_tens1.to('cuda')
+            cal_tens2 = cal_tens2.to('cuda')
+            inputs = cal_tens1 - cal_tens2
+            peptide_tens = peptide_tens.to('cuda')
+            target_values = torch.tensor(target_values).view(-1, 1)
+            target_values = target_values.to('cuda')
+
+            this_output = network(inputs, peptide_tens)
+            tensor_list = list(this_output.flatten())
+            predict_list = [x.item() for x in tensor_list]
+            final_predict_list = final_predict_list + predict_list
+            actual_tens = list(target_values.flatten())
+            actual_list = [x.item() for x in actual_tens]
+            final_actual_list = final_actual_list + actual_list
+
+    plot_act_pred(final_predict_list,
+                    final_actual_list,
+                    'test',
+                    output_name)
+    
+    return final_predict_list, final_actual_list
+
 
 def plot_act_pred(predicted_data,
                   actual_data,
