@@ -76,13 +76,14 @@ class ResNet(nn.Module):
         self.res_layer4 = self.create_block(ResBlock, blocks_per_layer[3], out_channels=512, stride=2)
 
         #Initial input is 48 points along each dimension, narrows down to 1x1x1 by end of layer 4
-        self.fc1 = nn.Linear((512 * 1), 1024)
-        self.fc1_bn = nn.BatchNorm1d(1024)
-        self.fc2 = nn.Linear(1024, 64)
-        self.fc2_bn = nn.BatchNorm1d(64)
-        self.fc3 = nn.Linear(64, 1)
+        #Peptide tensor is length 19
+        self.fc1 = nn.Linear(531, 531)
+        self.fc1_bn = nn.BatchNorm1d(531)
+        self.fc2 = nn.Linear(531, 531)
+        self.fc2_bn = nn.BatchNorm1d(531)
+        self.fc3 = nn.Linear(531, 1)
 
-    def forward(self, in_tensor):
+    def forward(self, in_tensor, peptide_tensor):
         in_tensor = self.beg_conv1(in_tensor)
         in_tensor = self.beg_conv1_bn(in_tensor)
         in_tensor = self.relu(in_tensor)
@@ -94,6 +95,7 @@ class ResNet(nn.Module):
         in_tensor = self.res_layer4(in_tensor)
         
         in_tensor = in_tensor.reshape(in_tensor.shape[0], -1)
+        in_tensor = torch.cat((in_tensor, peptide_tensor), dim=1)
         in_tensor = self.fc1(in_tensor)
         in_tensor = self.fc1_bn(in_tensor)
         in_tensor = self.relu(in_tensor)
@@ -151,6 +153,7 @@ class FullAdsorptionDataset(Dataset):
                  pq_file_name,
                  csv_file_directory,
                  binding_file,
+                 one_hot_file,
                  test_set,
                  training_batch_size):
         """
@@ -193,6 +196,8 @@ class FullAdsorptionDataset(Dataset):
                                                                      self.prefix_list)
         self.tensor_dict = CDL.create_tensor_dict(self.prefix_list,
                                                   self.molecule_frame)
+        self.one_hot_tags = CDL.load_peptide_one_hot(csv_file_directory,
+                                                     one_hot_file)
 
     def __len__(self):
         return len(self.calix_pairs)
@@ -208,7 +213,9 @@ class FullAdsorptionDataset(Dataset):
 
         sample_value = self.log_val_list[idx]
 
-        return first_tens, second_tens, sample_value
+        peptide_tensor = self.one_hot_tags[self.peptide_list[idx]]
+
+        return first_tens, second_tens, peptide_tensor, sample_value
 
 
 def val_train_indices(dataset,
@@ -261,6 +268,7 @@ def train_network(network,
                   pq_file_name,
                   csv_file_directory,
                   binding_file,
+                  one_hot_file,
                   test_set,
                   output_name,
                   batch_size,
@@ -309,6 +317,7 @@ def train_network(network,
                                             pq_file_name,
                                             csv_file_directory,
                                             binding_file,
+                                            one_hot_file,
                                             test_set,
                                             batch_size)
 
@@ -351,20 +360,21 @@ def train_network(network,
 
         for data in train_loader:
             #Gather input values
-            cal_tens1, cal_tens2, target_values = data
+            cal_tens1, cal_tens2, peptide_tens, target_values = data
             target_values = target_values.view(-1, 1)
             
             #Send data to GPU
             cal_tens1 = cal_tens1.to('cuda')
             cal_tens2 = cal_tens2.to('cuda')
             inputs = cal_tens1 - cal_tens2
+            peptide_tens = peptide_tens.to('cuda')
             target_values = target_values.to('cuda')
             
             #Set current gradients to zero
             optimize.zero_grad()
             
             #Forward, backward, optimize
-            output = network(inputs)
+            output = network(inputs, peptide_tens)
             loss_amount = loss_func(output, target_values.float())
             loss_amount.float()
             loss_amount.backward()
@@ -380,17 +390,18 @@ def train_network(network,
         total_val_loss = 0
         with torch.no_grad():
             for data in val_loader:
-                cal_tens1, cal_tens2, target_values = data
+                cal_tens1, cal_tens2, peptide_tens, target_values = data
                 target_values = target_values.view(-1, 1)
                 
                 #Send data to GPU
                 cal_tens1 = cal_tens1.to('cuda')
                 cal_tens2 = cal_tens2.to('cuda')
                 inputs = cal_tens1 - cal_tens2
+                peptide_tens = peptide_tens.to('cuda')
                 target_values = target_values.to('cuda')
             
                 #Forward pass only
-                val_output = network(inputs)
+                val_output = network(inputs, peptide_tens)
                 val_loss_size = loss_func(val_output, target_values)
                 total_val_loss += float(val_loss_size.item())
         
@@ -450,6 +461,7 @@ def cnn_work_flow(pq_file_directory,
                   pq_file_name,
                   csv_file_directory,
                   binding_file,
+                  one_hot_file,
                   test_set,
                   output_name,
                   batch_size,
@@ -501,6 +513,7 @@ def cnn_work_flow(pq_file_directory,
                                   pq_file_name,
                                   csv_file_directory,
                                   binding_file,
+                                  one_hot_file,
                                   test_set,
                                   output_name,
                                   batch_size,

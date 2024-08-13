@@ -13,10 +13,10 @@ import ResNet.CalixNet as CNN
 import DataLoaders.CDKDataLoader as CDL
 
 pq_file_directory = 'PQFiles'
-pq_file_name = '50C_Boltz_Fac1_Comb_Nor_10A.pq'
+pq_file_name = 'Alok_Thesis_Comb_10A.pq'
 csv_file_directory = 'ClusterData'
 binding_file = 'Data excluding non-binders.csv'
-test_set = ['F1', 'E2']
+test_set = ['BH5', 'E9', 'F1', 'E2']
 output_name ='FirstTest'
 batch_size = 80
 val_split = 0.1

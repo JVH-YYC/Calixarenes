@@ -309,6 +309,39 @@ def calculate_ads_w_error(value_tuple):
     
     return log_value
 
+def load_peptide_one_hot(binding_file_directory,
+                    one_hot_csv):
+    """
+    Takes a file with one-hot encodings and a string designating a peptide
+    Returns a one-dimensionaltensor that has one hot encoding values for the peptide
+
+    Parameters
+    ----------
+    one_hot_csv : string
+        Name of the .csv file with one-hot encodings
+    binding_file_directory : string
+        Name of the directory holding CSV files
+    peptide_name : string
+        Name of the peptide being analyzed
+
+    Returns
+    -------
+    Pytorch tensor with one-hot encoding data
+
+    """
+    one_hot_tags = {}
+    csv_path = Path('.', binding_file_directory)
+    
+    one_hot_frame = pd.read_csv(csv_path / one_hot_csv,
+                               header=0,
+                               index_col=0)
+    
+    for entry in one_hot_frame.index:
+        one_hot_list = list(one_hot_frame.loc[entry])
+        one_hot_tensor = torch.FloatTensor(one_hot_list)
+        one_hot_tags[entry] = one_hot_tensor
+
+    return one_hot_tags
 
 #Quick test
 
