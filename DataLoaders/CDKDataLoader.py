@@ -243,6 +243,13 @@ def enumerate_test_calix(binding_file,
                 peptide_list.append(peptide)
                 log_pair_values.append(np.log((adsorption_frame.at[prefix_list[entry], peptide]) / (adsorption_frame.at[test_set[second_entry], peptide])))
     
+    print('Quality control check. Ensure only test set calixarenes are in second position')
+    print('Size of test set is:', len(calix_pairs))
+    for entry in calix_pairs:
+        if entry[1] not in test_set:
+            print('Error: Test set calixarene in wrong position')
+            print(entry)
+
     return calix_pairs, peptide_list, log_pair_values
                                        
 def key_to_tensor(inverse_flag,

@@ -19,10 +19,10 @@ binding_file = 'Data excluding non-binders.csv'
 one_hot_file = 'one_hot_short.csv'
 exclude_calix = ['BH5', 'E9', 'F1', 'E2', 'E5']
 test_set = ['AP3', 'BM1']
-output_name ='FirstTest'
-batch_size = 85
+output_name ='AP3 BM1 Test'
+batch_size = 400
 val_split = 0.1
-training_epochs = 1
+training_epochs = 300
 learning_rate = 0.003
 current_iteration = 0
 

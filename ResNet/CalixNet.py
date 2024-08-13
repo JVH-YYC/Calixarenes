@@ -256,7 +256,8 @@ def val_train_indices(dataset,
 
 
 def loss_and_optim(network,
-                    learning_rate):
+                    learning_rate,
+                    lr_patience=30):
     """
     Creates Pytorch loss function and optimizer
 
@@ -278,7 +279,16 @@ def loss_and_optim(network,
     optimize = optim.Adam(network.parameters(),
                           lr=learning_rate)
     
-    return loss_function, optimize
+    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimize,
+                                                    mode='min',
+                                                    factor=0.1,
+                                                    patience=lr_patience,
+                                                    threshold=0.0001,
+                                                    min_lr=(learning_rate / 10001),
+                                                    verbose=True)
+
+
+    return loss_function, optimize, lr_sched
 
 def train_network(network,
                   pq_file_directory,
@@ -357,7 +367,7 @@ def train_network(network,
 
     num_batches = len(train_loader)
         
-    loss_func, optimize = loss_and_optim(network, learning_rate)
+    loss_func, optimize, lr_sched = loss_and_optim(network, learning_rate)
 
     training_start = time.time()
 
@@ -456,6 +466,10 @@ def train_network(network,
                                                     '_val',
                                                     save_string[:-3])
             
+            test_pred, test_act = single_test_pass(network,
+                                            adsorption_data,
+                                            save_string[:-3])
+
             return training_log
 
     print('Iteration', str(current_iteration), 'finished')
