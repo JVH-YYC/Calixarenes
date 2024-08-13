@@ -757,29 +757,55 @@ def single_test_pass(network,
     Must be called independently for safety.
     """
 
+    batch_size = dataset_obj.training_batch_size
+
     with torch.no_grad():
         final_predict_list = []
         final_actual_list = []
+        
+        # Initialize batch lists
+        batch_cal_tens1 = []
+        batch_cal_tens2 = []
+        batch_peptide_tens = []
+        batch_target_values = []
+        
         for example in range(len(dataset_obj.test_pairs)):
+            # Gather input values for this example
             cal_tens1 = dataset_obj.test_tensor_dict[dataset_obj.test_pairs[example][0]]
             cal_tens2 = dataset_obj.test_tensor_dict[dataset_obj.test_pairs[example][1]]
             peptide_tens = dataset_obj.one_hot_tags[dataset_obj.test_peptides[example]]
             target_values = dataset_obj.test_log_vals[example]
-
-            cal_tens1 = cal_tens1.to('cuda')
-            cal_tens2 = cal_tens2.to('cuda')
-            inputs = cal_tens1 - cal_tens2
-            peptide_tens = peptide_tens.to('cuda')
-            target_values = torch.tensor(target_values).view(-1, 1)
-            target_values = target_values.to('cuda')
-
-            this_output = network(inputs, peptide_tens)
-            tensor_list = list(this_output.flatten())
-            predict_list = [x.item() for x in tensor_list]
-            final_predict_list = final_predict_list + predict_list
-            actual_tens = list(target_values.flatten())
-            actual_list = [x.item() for x in actual_tens]
-            final_actual_list = final_actual_list + actual_list
+            
+            # Append to batch lists
+            batch_cal_tens1.append(cal_tens1)
+            batch_cal_tens2.append(cal_tens2)
+            batch_peptide_tens.append(peptide_tens)
+            batch_target_values.append(torch.tensor(target_values).view(-1, 1))
+            
+            # Process the batch when it reaches the specified batch size or at the end of the dataset
+            if (example + 1) % batch_size == 0 or (example + 1) == len(dataset_obj.test_pairs):
+                # Stack tensors to form a batch
+                batch_cal_tens1 = torch.stack(batch_cal_tens1).to('cuda')
+                batch_cal_tens2 = torch.stack(batch_cal_tens2).to('cuda')
+                batch_inputs = batch_cal_tens1 - batch_cal_tens2
+                batch_peptide_tens = torch.stack(batch_peptide_tens).to('cuda')
+                batch_target_values = torch.cat(batch_target_values).to('cuda')
+                
+                # Forward pass through the network
+                batch_output = network(batch_inputs, batch_peptide_tens)
+                
+                # Convert output and targets to lists and accumulate results
+                predict_list = batch_output.flatten().tolist()
+                actual_list = batch_target_values.flatten().tolist()
+                
+                final_predict_list.extend(predict_list)
+                final_actual_list.extend(actual_list)
+                
+                # Reset batch lists
+                batch_cal_tens1 = []
+                batch_cal_tens2 = []
+                batch_peptide_tens = []
+                batch_target_values = []
 
     plot_act_pred(final_predict_list,
                     final_actual_list,
