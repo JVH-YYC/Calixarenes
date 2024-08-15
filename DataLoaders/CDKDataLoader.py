@@ -38,6 +38,18 @@ def coordinate_load(pq_file_name,
     
     return molecule_frame
 
+def load_absolute_adsorption(csv_file_directory,
+                             binding_file):
+    """
+    Simple script that loads the .csv file which contains absolute binding values
+    """
+    csv_path = Path('.', csv_file_directory)
+    adsorption_frame = pd.read_csv(csv_path / binding_file,
+                                      header=0,
+                                      index_col=0)
+    
+    return adsorption_frame
+
 def calixarene_list(molecule_frame,
                     test_list):
     """
@@ -157,9 +169,9 @@ def fully_enumerate_set(binding_file,
     """
     Takes a .csv with adsorption values, and a prefix list of calixarene names
     The prefix list **has already had the validation set removed**
-    Creates a half-enumerated list of calix 1 / calix 2 / peptide combinations
-    Only 'half-enumerated' because is ('CP2', 'AP3') is an entry, then ('AP3', 'CP2')
-    will be excluded (prevents leakage between training/test set)
+    Creates a fully-enumerated list: that is, it includes both calix_1 / calix_2
+    and calix_2 / calix_1 pairs, with the associated peptide and log value.
+    
     
 
     Parameters
@@ -199,7 +211,40 @@ def fully_enumerate_set(binding_file,
                 peptide_list.append(peptide)
                 log_pair_values.append(np.log((adsorption_frame.at[prefix_list[entry], peptide]) / (adsorption_frame.at[prefix_list[(entry + second_entry)], peptide])))
     
-    return calix_pairs, peptide_list, log_pair_values
+    inv_calix_pairs = [(entry[1], entry[0]) for entry in calix_pairs]
+    inv_log_pair_values = [-1 * entry for entry in log_pair_values]
+
+    full_calix_list = calix_pairs + inv_calix_pairs
+    full_peptide_list = peptide_list + peptide_list
+    full_log_list = log_pair_values + inv_log_pair_values
+
+    return full_calix_list, full_peptide_list, full_log_list
+
+def simple_enumerate_set(binding_file,
+                         csv_file_directory,
+                         prefix_list):
+    """
+    For the creation of a simple absolute training/testing dataset
+    Takes a .csv with adsorption values, and a prefix list of calixarene names
+    """
+
+    csv_path = Path('.', csv_file_directory)
+
+    adsorption_frame = pd.read_csv(csv_path / binding_file,
+                                      header=0,
+                                      index_col=0)
+    
+    training_calix_list = []
+    peptide_list = []
+    log_absolute_values = []
+
+    for peptide in list(adsorption_frame.columns):
+        for entry in range(len(prefix_list)):
+            training_calix_list.append(prefix_list[entry])
+            peptide_list.append(peptide)
+            log_absolute_values.append(np.log(adsorption_frame.at[prefix_list[entry], peptide]))
+
+    return training_calix_list, peptide_list, log_absolute_values
 
 def enumerate_test_calix(binding_file,
                          csv_file_directory,
@@ -251,7 +296,33 @@ def enumerate_test_calix(binding_file,
             print(entry)
 
     return calix_pairs, peptide_list, log_pair_values
-                                       
+
+def enumerate_absolute_test_calix(binding_file,
+                                  csv_file_directory,
+                                  test_set):
+    """
+    A complementary function to that above - creates the test set when training on
+    absolute adsorption data rather than relative
+    """
+
+    csv_path = Path('.', csv_file_directory)
+
+    adsorption_frame = pd.read_csv(csv_path / binding_file,
+                                      header=0,
+                                      index_col=0)
+    
+    test_calix = []
+    peptide_list = []
+    log_absolute_values = []
+
+    for peptide in list(adsorption_frame.columns):
+        for entry in test_set:
+            test_calix.append(entry)
+            peptide_list.append(peptide)
+            log_absolute_values.append(np.log(adsorption_frame.at[entry, peptide]))
+
+    return test_calix, peptide_list, log_absolute_values
+
 def key_to_tensor(inverse_flag,
                   calix_tuple,
                   data_frame):

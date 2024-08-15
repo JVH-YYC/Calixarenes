@@ -12,6 +12,7 @@ Top level function for training CNN network: UVic calixarene project V2
 import ResNet.CalixNet as CNN
 import DataLoaders.CDKDataLoader as CDL
 
+# Initial training of the network
 initial_calix_list = ['E11', 'BH2', 'BP0', 'AH2', 'AH1',
                       'DM1', 'BM1', 'AM2', 'AM1', 'DP2',
                       'CP2', 'CP1', 'BP1', 'PNO2', 'PSC4',
@@ -21,6 +22,7 @@ initial_calix_list = ['E11', 'BH2', 'BP0', 'AH2', 'AH1',
                       'AO3', 'AO2', 'AO1', 'AH7', 'AH6', 'AH5']
 
 for calix in initial_calix_list:
+    print('Processing calixarene:', calix)
     pq_file_directory = 'PQFiles'
     pq_file_name = 'Alok_Thesis_Comb_10A.pq'
     csv_file_directory = 'CSVFiles'
@@ -28,12 +30,18 @@ for calix in initial_calix_list:
     one_hot_file = 'one_hot_short.csv'
     exclude_calix = ['BH5', 'E9', 'F1', 'E2', 'E5']
     test_set = [calix,]
-    output_name ='Initial LOO ' + calix
+    output_name ='LOO Abs Train ' + calix
     batch_size = 400
     val_split = 0.1
-    training_epochs = 300
-    learning_rate = 0.003
-    current_iteration = 0
+    min_epochs = 100
+    training_epochs = 400
+    learning_rate = 0.00067
+    resnet_block_list = [2,3,2,3]
+    dropout_amount = 0.15
+    absolute_training = True
+    absolute_predictions = True
+    state_dict_directory = '/home/jvh/Desktop/Trained Calix ResNets/'
+    state_dict_name = 'First Inverse Training E_iter_0.pt'
 
     CNN.cnn_work_flow(pq_file_directory,
                     pq_file_name,
@@ -45,39 +53,83 @@ for calix in initial_calix_list:
                     output_name,
                     batch_size,
                     val_split,
+                    min_epochs,
                     training_epochs,
                     learning_rate,
-                    current_iteration)
+                    resnet_block_list,
+                    dropout_amount,
+                    absolute_training,
+                    absolute_predictions,
+                    save_model=True)
 
-# CNN.batch_work_flow(file_name_variable=False,
-#                     pq_file_directory='PQFiles',
-#                     pq_file_name_list=['50C_Boltz_Fac2_shallow_Comb_Nor.pq',],
-#                     csv_file_directory='CSVTrain',
-#                     binding_file='Design_Val_NoErr.csv',
-#                     test_set=['p1_8',
-#                               'p1_8_alt',
-#                               'p1_21',
-#                               'p1_21_alt',
-#                               'p1_38',
-#                               'p1_38_alt',
-#                               'p2_21',
-#                               'p2_40',
-#                               'p3_4aq',
-#                               'p3_4bh',
-#                               'p4_6',
-#                               'p5_9',
-#                               'p6_10',
-#                               'p6_27',],
-#                     output_name='Feb20_NoErr',
-#                     batch_size_variable=False,
-#                     batch_size_list=[80,],
-#                     val_split=0.2,
-#                     training_epochs=300,
-#                     learn_rate_variable=False,
-#                     learn_rate_list=[0.003,])
+    # CNN.load_and_test_saved_model(state_dict_directory,
+    #                             state_dict_name,
+    #                             pq_file_directory,
+    #                             pq_file_name,
+    #                             csv_file_directory,
+    #                             binding_file,
+    #                             one_hot_file,
+    #                             exclude_calix,
+    #                             test_set,
+    #                             output_name,
+    #                             batch_size,
+    #                             absolute_predictions)
 
-                                     
-                    
+#Hyperparameter tuning
+
+# num_searches = 10
+# pq_file_directory = 'PQFiles'
+# pq_file_name = 'Alok_Thesis_Comb_10A.pq'
+# csv_file_directory = 'CSVFiles'
+# binding_file = 'Data excluding non-binders.csv'
+# one_hot_file = 'one_hot_short.csv'
+# exclude_calix = ['BH5', 'E9', 'F1', 'E2', 'E5']
+# output_name = 'abs hyper rd 2'
+# batch_size = 400
+# val_split = 0.1
+# min_epochs = 100
+# training_epochs = 400
+# learning_rate_list = [0.033, 0.01, 0.0033, 0.001, 0.00033]
+# resnet_block_list = [[2, 2, 2, 2],
+#                      [2, 2, 3, 3],
+#                      [3, 3, 2, 2],
+#                      [3, 3, 3, 3],
+#                      [2, 3, 3, 2],
+#                      [3, 2, 2, 3]]
+# dropout_amount_list = [0.0, 0.025, 0.05, 0.1, 0.2,]
+# Above values are fixed for round 1, below are altered for round 2
+# learning_rate_list = [0.01, 0.0067, 0.0033, 0.0001, 0.00067]
+# resnet_block_list = [[3, 3, 3, 3],
+#                      [2, 2, 2, 2],
+#                      [1, 1, 1, 1],
+#                      [2, 1, 1, 2],
+#                      [1, 2, 2, 1],
+#                      [2, 3, 2, 3]]
+# dropout_amount_list = [0.1, 0.15, 0.2, 0.25, 0.3]
+# absolute_training = True
+# absolute_predictions = True
+# save_all_models = False
+# save_best_model = True
+
+# CNN.random_calix_hyper_search(num_searches=num_searches,
+#                               pq_file_directory=pq_file_directory,
+#                               pq_file_name=pq_file_name,
+#                               csv_file_directory=csv_file_directory,
+#                               binding_file=binding_file,
+#                               one_hot_file=one_hot_file,
+#                               exclude_calix=exclude_calix,
+#                               output_name=output_name,
+#                               batch_size=batch_size,
+#                               val_split=val_split,
+#                               min_epochs=min_epochs,
+#                               training_epochs=training_epochs,
+#                               learning_rate_list=learning_rate_list,
+#                               dropout_amount_list=dropout_amount_list,
+#                               resnet_block_list=resnet_block_list,
+#                               absolute_training=absolute_training,
+#                               absolute_predictions=absolute_predictions,
+#                               save_all_models=save_all_models,
+#                               save_best_model=save_best_model)
                     
 
 
