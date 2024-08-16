@@ -4,12 +4,12 @@ core_b,[17OH]C1=C2C=C(S([O-])(=O)=O)C=C1CC3=C([17OH])C(CC4=CC(S(=O)([O-])=O)=CC(
 core_c,[Y]C1=CC(CC2=CC(S(=O)([O-])=O)=CC(C3)=[13C]2[17O-])=C([17OH])C(CC4=C([17OH])C(CC5=C([17OH])C3=CC([Y])=C5)=CC([Y])=C4)=C1,c
 core_d,[17OH]C1=C2C=C([Y])C=C1CC3=C([17OH])C(CC4=CC(S(=O)([O-])=O)=CC(CC5=C([17OH])C(C2)=CC(S(=O)([O-])=O)=C5)=[13C]4[17O-])=CC([Y])=C3,c
 core_e,[17OH]C1=C(CC2=CC(S(=O)([O-])=O)=CC(C3)=[13C]2[17O-])C=C(S(=O)([O-])=O)C=C1CC4=C([17OH])C(CC5=C([17OH])C3=CC(S(=O)([O-])=O)=C5)=CC(N[Y])=C4,c
-core_f,[Y]C1=C2C=C(OCC([O-])=O)C=C1CC3=C([17OH])C(CC4=CC(S(=O)([O-])=O)=CC(CC5=C([17OH])C(C2)=CC(S(=O)([O-])=O)=C5)=[13C]4[17O-])=CC(S(=O)([O-])=O)=C3,c
+core_f,[Y]C1=C2C=C([17O]CC([O-])=O)C=C1CC3=C([17OH])C(CC4=CC(S(=O)([O-])=O)=CC(CC5=C([17OH])C(C2)=CC(S(=O)([O-])=O)=C5)=[13C]4[17O-])=CC(S(=O)([O-])=O)=C3,c
 core_f4,[Y]C1=C2C=C(C=C1CC3=C(C(CC4=CC(S(=O)([O-])=O)=CC(CC5=C(C(C2)=CC(S(=O)([O-])=O)=C5)[17OH])=[13C]4[17O-])=CC(S(=O)([O-])=O)=C3)[17OH])S(=O)([O-])=O,c
 core_6,[17O-][13C]1=C(C2=C([17OH])C(C3=C([17OH])C4=CC(S([O-])(=O)=O)=C3)=CC(S([O-])(=O)=O)=C2)C=C(S(=O)([O-])=O)C=C1C5=CC(S([O-])(=O)=O)=CC(C6=CC(S([O-])(=O)=O)=CC(C7=CC(S([O-])(=O)=O)=CC4=C7[Y])=C6[17OH])=C5[17OH],c
 core_no2,[Y]C1=C2C=C(C=C1CC3=C(C(CC4=CC(S(=O)([O-])=O)=CC(CC5=C(C(C2)=CC(S(=O)([O-])=O)=C5)[17OH])=[13C]4[17O-])=CC(S(=O)([O-])=O)=C3)[17OH])[N+]([O-])=O,c
 psc4,[Y]S([O-])(=O)=O,s
-psc,[Y]O,s
+psc,[Y][17OH],s
 p0,[Y]C1=CC=CC=C1,s
 p1,[Y]C1=CC=C(CC([O-])=O)C=C1,s
 p2,[Y]C1=CC=C(C([O-])=O)C=C1,s
@@ -43,4 +43,4 @@ e8,[Y]NC(NC1=CC=C(C)C=C1)=S,s
 e9,[Y]S(C(C=C1)=CC=C1[N+]([O-])=O)(=O)=O,s
 e10,[Y]S(C1=C(Br)C=CC=C1)(=O)=O,s
 e11,[Y]S(C1=C(F)C(F)=C(F)C(F)=C1F)(=O)=O,s
-f4,O=C([O-])C1=CC=C(S(=O)(O[Y])=O)C=C1,s
+f4,O=C([O-])C1=CC=C(S(=O)([17O][Y])=O)C=C1,s
