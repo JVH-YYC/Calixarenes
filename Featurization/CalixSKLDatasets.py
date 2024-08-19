@@ -2,7 +2,7 @@
 Benchmark ML scripts for calixarene evaluations
 """
 import os
-os.chdir('/Users/jeffreyvanhumbeck/Documents/GitHub/Calixarenes/')
+import platform
 import random
 import itertools
 import numpy as np
@@ -11,6 +11,12 @@ import pandas as pd
 from sklearn import svm
 from sklearn.ensemble import RandomForestRegressor as RFR 
 from Featurization import CalixSKLFeatures as CSF
+
+#Check which machine we are on
+if platform.system() == 'Darwin':
+    os.chdir('/Users/jeffreyvanhumbeck/Documents/GitHub/Calixarenes/')
+elif platform.system() == 'Linux':
+    os.chdir('/home/jvh/Documents/GitHub/Calixarenes/')
 
 def create_ecfp_dictionary(calixarene_csv_folder,
                            calixarene_csv_file,
@@ -199,8 +205,14 @@ def cross_validation_split_calix_dataset(calixarene_dict,
 
     # Split the data by host
     elif split_method == 'by_host':
-        # Create a set of unique hosts
-        calix_host_set = {calix.split('_')[0] for calix in calixarene_dict}
+        calix_host_set = set()
+        
+        # Create a set of unique hosts. Depends on training type (absolute or relative)
+        first_key = next(iter(calixarene_dict))
+        if type(first_key) == str:
+            calix_host_set = {calix.split('_')[0] for calix in calixarene_dict}
+        elif type(first_key) == tuple:
+            calix_host_set = {host.split('_')[0] for calix in calixarene_dict for host in calix}
         calix_host_list = list(calix_host_set)
         random.shuffle(calix_host_list)
 
@@ -223,14 +235,28 @@ def cross_validation_split_calix_dataset(calixarene_dict,
             train_host_set = calix_host_set - validation_host_set - test_host_set
 
             for calix, value in calixarene_dict.items():
-                host = calix.split('_')[0]
-                if host in train_host_set:
-                    calixarene_cv_dict[target_dict_key]['train'][calix] = value
-                elif host in validation_host_set:
-                    calixarene_cv_dict[target_dict_key]['validation'][calix] = value
-                elif host in test_host_set:
-                    calixarene_cv_dict[target_dict_key]['test'][calix] = value
-    
+                if type(calix) == str:
+                    host = calix.split('_')[0]
+                    if host in train_host_set:
+                        calixarene_cv_dict[target_dict_key]['train'][calix] = value
+                    elif host in validation_host_set:
+                        calixarene_cv_dict[target_dict_key]['validation'][calix] = value
+                        print('Added to validation set:', calix)
+                    elif host in test_host_set:
+                        calixarene_cv_dict[target_dict_key]['test'][calix] = value
+                        print('Added to test set:', calix)
+                elif type(calix) == tuple:
+                    host1 = calix[0].split('_')[0]
+                    host2 = calix[1].split('_')[0]
+                    if host1 in train_host_set and host2 in train_host_set:
+                        calixarene_cv_dict[target_dict_key]['train'][calix] = value
+                    elif host1 in validation_host_set or host2 in validation_host_set:
+                        calixarene_cv_dict[target_dict_key]['validation'][calix] = value
+                        print('Added to validation set:', calix)
+                    elif host1 in test_host_set or host2 in test_host_set:
+                        calixarene_cv_dict[target_dict_key]['test'][calix] = value
+                        print('Added to test set:', calix)
+
     return calixarene_cv_dict
     
 def organize_random_forest_input(split_calix_dataset,
