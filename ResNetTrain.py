@@ -24,7 +24,7 @@ initial_calix_list = ['E11', 'BH2', 'BP0', 'AH2', 'AH1',
 for calix in initial_calix_list:
     print('Processing calixarene:', calix)
     pq_file_directory = 'PQFiles'
-    pq_file_name = 'Alok_Thesis_Comb_10A.pq'
+    pq_file_name = 'AlokThesis10A_Comb.pq'
     csv_file_directory = 'CSVFiles'
     binding_file = 'Data excluding non-binders.csv'
     one_hot_file = 'one_hot_short.csv'
@@ -38,8 +38,8 @@ for calix in initial_calix_list:
     learning_rate = 0.00067
     resnet_block_list = [2,3,2,3]
     dropout_amount = 0.15
-    absolute_training = True
-    absolute_predictions = True
+    absolute_training = False
+    absolute_predictions = False
     state_dict_directory = '/home/jvh/Desktop/Trained Calix ResNets/'
     state_dict_name = 'First Inverse Training E_iter_0.pt'
 

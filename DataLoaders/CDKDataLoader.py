@@ -58,6 +58,9 @@ def calixarene_list(molecule_frame,
     included in the 'test' list
     Returns a list of prefixes for further operations
 
+    Updated combined PQ files does not have additional '_U' or '_D' labels, so adjust
+    how the calixarene list is generated.
+
     Parameters
     ----------
     molecule_frame : pandas DataFrame
@@ -89,8 +92,8 @@ def calixarene_list(molecule_frame,
             print('No underscore detected in entry:', entry)
             
         if underscore == True:
-            #All data has extra label '_U' and '_D' for flipped conformers, so remove these from label
-            current_prefix = entry[0:(counter - 3)]
+            #Aug 2024 data has no extra label, so remove the old deletion
+            current_prefix = entry[0:(counter- 1)]
             if current_prefix not in test_list and current_prefix not in prefix_list:
                 prefix_list.append(current_prefix)
     return prefix_list
@@ -370,15 +373,17 @@ def create_tensor_dict(calixarene_list, data_frame):
     """
     Takes a list of calixarenes, and creates a dictionary that has pytorch tensors for
     each given calixarene. These will be called by the pytorch itemgetter during training,
-    rather than creating a fresh tensor for each example (old approach)
+    rather than creating a fresh tensor for each example (old approach).
+
+    Aug 2024 dataset no longer has multiple starts on grid population, so don't need to append '_1' to all calixarenes
     """
     tensor_dict = {}
 
     for entry in calixarene_list:
-        cal_1_aso = entry + '_1' + '_ASO'
-        cal_1_pos = entry + '_1' + '_POS'
-        cal_1_neg = entry + '_1' + '_NEG'
-        cal_1_pol = entry + '_1' + '_POL'
+        cal_1_aso = entry + '_ASO'
+        cal_1_pos = entry + '_POS'
+        cal_1_neg = entry + '_NEG'
+        cal_1_pol = entry + '_POL'
 
         calix_1_frame = pd.DataFrame({
             'x': data_frame['x'],
