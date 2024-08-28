@@ -24,6 +24,7 @@ import random
 import numpy as np
 from pathlib import Path
 import DataLoaders.CDKDataLoader as CDL
+import pickle
 
 
 class ResBlock(nn.Module):
@@ -338,6 +339,8 @@ class AbsoluteAdsorptionDataset(Dataset):
 
 def load_trained_model(state_dict_directory,
                        state_dict_name,
+                       input_block_list,
+                       dropout_amount,
                        device='cuda'):
     """
     Function to re-load a previously trained model from a state dictionary file
@@ -345,7 +348,8 @@ def load_trained_model(state_dict_directory,
     Returns the model with the desired state dictionary loaded
     """
 
-    model = ResNet18(4)
+    model = ResNet18(input_block_list,
+                     dropout_amount)
     model = model.float()
     state_dict = torch.load(state_dict_directory + state_dict_name, map_location=device)
 
@@ -444,6 +448,29 @@ def loss_and_optim(network,
 
     return loss_function, optimize, lr_sched
 
+def extract_predicted_actual(nested_dict):
+    """
+    Traverse a nested dictionary and extract 'predicted' and 'actual' values into corresponding lists.
+    
+    Args:
+    - nested_dict (dict): The nested dictionary with two levels of keys. At the bottom level, there are 
+                          'predicted' and 'actual' entries, each pointing to a float value.
+    
+    Returns:
+    - predicted_list (list): A list of all 'predicted' float values, ordered.
+    - actual_list (list): A list of all 'actual' float values, ordered.
+    """
+    predicted_list = []
+    actual_list = []
+
+    for first_key in nested_dict:
+        for second_key in nested_dict[first_key]:
+            data_dict = nested_dict[first_key][second_key]
+            predicted_list.append(data_dict['predicted'])
+            actual_list.append(data_dict['actual'])
+
+    return predicted_list, actual_list
+
 def train_network(network,
                   pq_file_directory,
                   pq_file_name,
@@ -460,7 +487,8 @@ def train_network(network,
                   learning_rate,
                   absolute_training,
                   absolute_predictions,
-                  save_model):
+                  save_model,
+                  save_test_dictionary):
     """
     Training loop for network training, including early stopping, data logging,
     and figure generation for review.
@@ -664,10 +692,11 @@ def train_network(network,
                                                 save_string[:-3])
                 test_loss = loss_func(torch.tensor(test_pred), torch.tensor(test_act))
             else:
-                abs_test_pred, abs_test_act = single_abs_test_pass(network,
+                predict_dict = single_abs_test_pass(network,
                                                                    adsorption_data,
-                                                                   absolute_training,
-                                                                   save_string[:-3])
+                                                                   absolute_training)
+                
+                abs_test_pred, abs_test_act = extract_predicted_actual(predict_dict)
 
                 test_loss = loss_func(torch.tensor(abs_test_pred), torch.tensor(abs_test_act))
 
@@ -699,10 +728,11 @@ def train_network(network,
                                                 save_string[:-3])
         test_loss = loss_func(torch.tensor(test_pred), torch.tensor(test_act))
     else:
-        abs_test_pred, abs_test_act = single_abs_test_pass(network,
+        test_pred_dict = single_abs_test_pass(network,
                                                            adsorption_data,
-                                                           absolute_training,
-                                                           save_string[:-3])
+                                                           absolute_training)
+
+        abs_test_pred, abs_test_act = extract_predicted_actual(test_pred_dict)
 
         test_loss = loss_func(torch.tensor(abs_test_pred), torch.tensor(abs_test_act))
     
@@ -1001,60 +1031,6 @@ def random_calix_hyper_search(num_searches,
     
     return
         
-
-def load_and_test_saved_model(state_dict_directory,
-                              state_dict_name,
-                              pq_file_directory,
-                              pq_file_name,
-                              csv_file_directory,
-                              binding_file,
-                              one_hot_file,
-                              exclude_calix,
-                              test_set,
-                              output_name,
-                              batch_size,
-                              absolute_training,
-                              absolute_predictions):
-    """
-    Function to load a saved model and test it on the test set
-    """
-
-    model = load_trained_model(state_dict_directory,
-                               state_dict_name)
-    
-    if absolute_training == False:
-        adsorption_data = RelativeAdsorptionDataset(pq_file_directory,
-                                            pq_file_name,
-                                            csv_file_directory,
-                                            binding_file,
-                                            one_hot_file,
-                                            exclude_calix,
-                                            test_set,
-                                            batch_size)
-    else:
-        adsorption_data = AbsoluteAdsorptionDataset(pq_file_directory,
-                                            pq_file_name,
-                                            csv_file_directory,
-                                            binding_file,
-                                            one_hot_file,
-                                            exclude_calix,
-                                            test_set,
-                                            batch_size)
-    
-    if absolute_predictions == False:
-        #Not possible to do absolute training and relative predictions
-        test_pred, test_act = single_test_pass(model,
-                                               adsorption_data,
-                                               output_name)
-    else:
-        abs_test_pred, abs_test_act = single_abs_test_pass(model,
-                                                           adsorption_data,
-                                                           absolute_training,
-                                                           output_name)
-        
-    return
-
-
 def plot_all_results(training_log_dict,
                       output_name):
     """
@@ -1230,8 +1206,7 @@ def single_test_pass(network,
 
 def single_abs_test_pass(network,
                          dataset_obj,
-                         absolute_training,
-                         output_name):
+                         absolute_training):
     """
     Takes a trained network and runs a forward pass on the test set
 
@@ -1246,6 +1221,8 @@ def single_abs_test_pass(network,
     """
 
     batch_size = dataset_obj.training_batch_size
+
+    test_return_dict = {}
 
     #Significant different format depending on whether training was relative or absolute
     if absolute_training == False:
@@ -1279,7 +1256,8 @@ def single_abs_test_pass(network,
                 cal2_name = dataset_obj.test_pairs[example][1]
                 peptide_tens = dataset_obj.one_hot_tags[dataset_obj.test_peptides[example]]
                 peptide_name = dataset_obj.test_peptides[example]
-                target_value = dataset_obj.absolute_ads_val.loc[cal2_name, peptide_name]
+                #Log absolute value is the target for prediction
+                target_value = np.log(dataset_obj.absolute_ads_val.loc[cal2_name, peptide_name])
                 known_value = dataset_obj.absolute_ads_val.loc[cal1_name, peptide_name]
 
                 # Append to batch lists. Double length of named lists to account for forward and inverse prediction **inside next loop**
@@ -1338,10 +1316,10 @@ def single_abs_test_pass(network,
             final_pred_dict[calix_host] = {}
             final_act_dict[calix_host] = {}
             for peptide in running_predict_dict[calix_host].keys():
-                #Average predictions as logs for appropriate chemical sense
+                #Average predictions as logs for appropriate chemical sense *and return as logs to match predictions!*
                 log_pred_list = [np.log(x) for x in running_predict_dict[calix_host][peptide]]
                 mean_pred = np.mean(log_pred_list)
-                final_pred_dict[calix_host][peptide] = np.exp(mean_pred)
+                final_pred_dict[calix_host][peptide] = mean_pred
                 final_act_dict[calix_host][peptide] = np.mean(running_actual_dict[calix_host][peptide])
     else:
         with torch.no_grad():
@@ -1400,21 +1378,13 @@ def single_abs_test_pass(network,
                     batch_peptide_name = []
                     batch_target_values = []
 
-    #Temporary: turn the dictionaries back into lists of log values for plotting
-    final_predict_list = []
-    final_actual_list = []
     for calix_host in final_pred_dict.keys():
+        test_return_dict[calix_host] = {}
         for peptide in final_pred_dict[calix_host].keys():
-            #Predictions are in log units, actual values are in raw
-            final_predict_list.append(final_pred_dict[calix_host][peptide])
-            final_actual_list.append(np.log(final_act_dict[calix_host][peptide]))
+            test_return_dict[calix_host][peptide] = {'predicted': final_pred_dict[calix_host][peptide],
+                                                      'actual': final_act_dict[calix_host][peptide]}
 
-    plot_act_pred(final_predict_list,
-                  final_actual_list,
-                  'abs_test',
-                  output_name)
-
-    return final_predict_list, final_actual_list
+    return test_return_dict
 
 def plot_act_pred(predicted_data,
                   actual_data,
@@ -1455,9 +1425,73 @@ def plot_act_pred(predicted_data,
 
     return
 
+def compile_predicted_actual_LOO_dict(model_translation_dict,
+                                      pq_file_directory,
+                                      pq_file_name,
+                                      csv_file_directory,
+                                      binding_file,
+                                      one_hot_file,
+                                      exclude_calix,
+                                      training_batch_size,
+                                      input_block_list,
+                                      dropout_amount,
+                                      absolute_training,
+                                      absolute_predictions,
+                                      output_name):
+    """
+    A function that takes as an input a dictionary, where the dictionary
+    keys are all calixarene hosts to be investigated ('AP8', 'BM2', etc.)
 
+    Each of these keys will point to a file directory and file name that contains
+    the saved model for that specific calixarene host.
 
+    A dataset with the target calixarene in the test set will be created, and will
+    be used to make the single test pass. The results will be compiled into a final
+    dictionary of the form {calixarene: {peptide: {'predicted': x, 'actual': y}}}
 
+    The compiled dictionary will be pickled for future plotting
+    """
+    prediction_dict = {}
+
+    for calix_host in model_translation_dict:
+        model = load_trained_model(model_translation_dict[calix_host][0],
+                                   model_translation_dict[calix_host][1],
+                                   input_block_list,
+                                   dropout_amount)
+        if absolute_training == False:
+            adsorption_data = RelativeAdsorptionDataset(pq_file_directory=pq_file_directory,
+                                                pq_file_name=pq_file_name,
+                                                csv_file_directory=csv_file_directory,
+                                                binding_file=binding_file,
+                                                one_hot_file=one_hot_file,
+                                                exclude_calix=exclude_calix,
+                                                test_set=[calix_host],
+                                                training_batch_size=training_batch_size)
+        else:
+            adsorption_data = AbsoluteAdsorptionDataset(pq_file_directory=pq_file_directory,
+                                                pq_file_name=pq_file_name,
+                                                csv_file_directory=csv_file_directory,
+                                                binding_file=binding_file,
+                                                one_hot_file=one_hot_file,
+                                                exclude_calix=exclude_calix,
+                                                test_set=[calix_host],
+                                                training_batch_size=batch_size)
+            
+        if absolute_predictions == True:
+            ### Will iterate through the test set, as the predictions go straight into
+            ### the dictionary to be returned
+            curr_result_dict = single_abs_test_pass(model,
+                                                    adsorption_data,
+                                                    absolute_training)
+            prediction_dict.update(curr_result_dict)
+
+    #Pickle the dictionary for future plotting
+    with open(output_name + '.pkl', 'wb') as f:
+        pickle.dump(prediction_dict, f)
+
+    return prediction_dict
+        
+        
 
 
 
