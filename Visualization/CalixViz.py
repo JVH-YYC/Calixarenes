@@ -31,7 +31,8 @@ def load_result_dict(result_folder,
         result_dict = pickle.load(f)
     return result_dict
 
-def organize_by_host(list_of_pickle_files):
+def organize_by_host(pickle_file_folder,
+                     list_of_pickle_files):
     """
     A function that takes a list of pickle files, and organizes the results by host.
 
@@ -41,7 +42,8 @@ def organize_by_host(list_of_pickle_files):
     organized_dict = {}
     for file in list_of_pickle_files:
         organized_dict[file] = {}
-        result_dict = load_result_dict(file)
+        result_dict = load_result_dict(pickle_file_folder,
+                                       file)
         for host in result_dict:
             if host not in organized_dict:
                 organized_dict[file][host] = []
@@ -49,7 +51,8 @@ def organize_by_host(list_of_pickle_files):
                 organized_dict[file][host].append(result_dict[host][peptide])
     return organized_dict
 
-def organize_by_peptide(list_of_pickle_files):
+def organize_by_peptide(pickle_file_folder,
+                        list_of_pickle_files):
     """
     A function that takes a list of pickle files, and organizes the results by peptide.
 
@@ -59,7 +62,8 @@ def organize_by_peptide(list_of_pickle_files):
     organized_dict = {}
     for file in list_of_pickle_files:
         organized_dict[file] = {}
-        result_dict = load_result_dict(file)
+        result_dict = load_result_dict(pickle_file_folder,
+                                       file)
         for host in result_dict:
             for peptide in result_dict[host]:
                 if peptide not in organized_dict[file]:
@@ -67,7 +71,8 @@ def organize_by_peptide(list_of_pickle_files):
                 organized_dict[file][peptide].append(result_dict[host][peptide])
     return organized_dict
 
-def multi_scatter_plot(list_of_pickle_files,
+def multi_scatter_plot(pickle_file_folder,
+                       list_of_pickle_files,
                        translation_dict,
                        plot_setting_dict,
                        organize_by,
@@ -103,22 +108,51 @@ def multi_scatter_plot(list_of_pickle_files,
     # Loop through the translation dictionary and plot each file, respecting organize_by and single_plots
     # The translation dictionary contains the relationship between file name and what should appear in plot legend
     # Data is organized using organize_by_host() and organize_by_peptide() functions above
-    list_of_data_dicts = []
-    for file in list_of_pickle_files:
-        list_of_data_dicts.append(load_result_dict(file))
-    
     if organize_by == 'host':
-        organized_dict = organize_by_host(list_of_pickle_files)
+        organized_dict = organize_by_host(pickle_file_folder,
+                                          list_of_pickle_files)
     elif organize_by == 'peptide':
-        organized_dict = organize_by_peptide(list_of_pickle_files)
+        organized_dict = organize_by_peptide(pickle_file_folder,
+                                             list_of_pickle_files)
     else:
+        list_of_data_dicts = []
+        organized_dict = {}
+        for file in list_of_pickle_files:
+            list_of_data_dicts.append(load_result_dict(pickle_file_folder,
+                                                       file))
         organized_dict['all'] = []
         for data_dict in list_of_data_dicts:
             for host in data_dict:
                 for peptide in data_dict[host]:
                     organized_dict['all'].append(data_dict[host][peptide])
 
-        
+    if organize_by == 'none':
+            # Extract the data to plot
+            print(organized_dict['all'])
+            predicted_values = [item['predicted'] for item in organized_dict['all']]
+            actual_values = [item['actual'] for item in organized_dict['all']]
+
+            # Extract the plot settings from translation_dict
+            color = translation_dict['all'].get('color', 'blue')
+            size = translation_dict['all'].get('size', 50)
+            opacity = translation_dict['all'].get('opacity', 0.7)
+            marker = translation_dict['all'].get('marker', 'o')
+
+            # Create the scatter plot
+            plt.scatter(predicted_values, actual_values, color=color, s=size, alpha=opacity, marker=marker)
+
+            # Add a diagonal line for reference (optional, comment out if not needed)
+            plt.plot([min(predicted_values), max(predicted_values)], 
+                    [min(predicted_values), max(predicted_values)], 
+                    color='black', linestyle='--', linewidth=1)
+
+            # Show or save the figure
+            if save_fig:
+                plt.savefig(output_name, bbox_inches='tight')
+            else:
+                plt.show()        
+    # Currently working here **********
+    return
 
 
 
