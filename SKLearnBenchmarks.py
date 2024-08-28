@@ -310,7 +310,7 @@ def perform_svm_grid_search(svm_data,
 #                                        0.1,
 #                                        CSS.peptide_one_hot_encoding)
 
-td = CSD.create_ecfp_dictionary(calixarene_csv_folder='Featurization/',
+td = CSD.create_relative_ecfp_dictionary(calixarene_csv_folder='Featurization/',
                                 calixarene_csv_file='calix smiles absolute.csv',
                                 target_columns=['H3K4me1',
                                                 'H3K4me2',
@@ -329,17 +329,17 @@ cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
                                                  num_folds=10)
 
 # Usage:
-for entry in range(10):
-    curr_dict = cv_sd['CV' + str(entry)]
-    rfi = CSD.organize_random_forest_input(split_calix_dataset=curr_dict,
-                                           dataset_target_type='all',
-                                           ordered_feature_list=['ECFP'],
-                                           peptide_one_hot_encoding=CSS.peptide_one_hot_encoding)
-    pickle_file_name = 'CV' + str(entry) + 'regression_svm_byhost_all_test_train_data.pkl'
-    best_params = perform_svm_grid_search(rfi,
-                                          mode = 'regression',
-                                          plot_best_model=True,
-                                          save_pickle_file=True,
-                                          pickle_file_name=pickle_file_name)
+# for entry in range(10):
+#     curr_dict = cv_sd['CV' + str(entry)]
+#     rfi = CSD.organize_random_forest_input(split_calix_dataset=curr_dict,
+#                                            dataset_target_type='all',
+#                                            ordered_feature_list=['ECFP'],
+#                                            peptide_one_hot_encoding=CSS.peptide_one_hot_encoding)
+#     pickle_file_name = 'CV' + str(entry) + 'regression_svm_first_rel_test.pkl'
+#     best_params = perform_svm_grid_search(rfi,
+#                                           mode = 'regression',
+#                                           plot_best_model=True,
+#                                           save_pickle_file=True,
+#                                           pickle_file_name=pickle_file_name)
 
 

@@ -71,14 +71,190 @@ def organize_by_peptide(pickle_file_folder,
                 organized_dict[file][peptide].append(result_dict[host][peptide])
     return organized_dict
 
+def get_plot_setting(setting_key,
+                     file_name=None,
+                     calix_name=None,
+                     peptide_name=None,
+                     file_setting_dict=None,
+                     calix_setting_dict=None,
+                     peptide_setting_dict=None,
+                     default_setting_dict=None):
+    """
+    Retrieve the plot setting value by checking the dictionaries in the specific order of priority:
+    file_setting_dict > calix_setting_dict > peptide_setting_dict.
+    
+    Args:
+    - setting_key (str): The key to search for in the dictionaries.
+    - file_setting_dict (dict or None): The dictionary for file-specific settings.
+    - calix_setting_dict (dict or None): The dictionary for calix-specific settings.
+    - peptide_setting_dict (dict or None): The dictionary for peptide-specific settings.
+    - default: The default value to return if the key is not found in any dictionaries.
+    
+    Returns:
+    - The value associated with the setting_key, or the default value if not found.
+    """
+    if file_setting_dict is not None and file_name is not None and setting_key in file_setting_dict[file_name]:
+        return file_setting_dict[file_name][setting_key]
+    
+    # Check in the calix_setting_dict based on the first character of the setting_key
+    if calix_setting_dict is not None and calix_name is not None and setting_key in calix_setting_dict[calix_name[0]]:
+        return calix_setting_dict[calix_name[0]][setting_key]
+    
+    if peptide_setting_dict is not None and peptide_name is not None and setting_key in peptide_setting_dict[peptide_name]:
+        return peptide_setting_dict[peptide_name][setting_key]
+    
+    return default_setting_dict[setting_key]
+
+def calculate_metrics(predicted_values, actual_values):
+    """
+    Calculate Mean Squared Error (MSE) and R² for given predicted and actual values.
+    
+    Args:
+    - predicted_values (list): List of predicted values.
+    - actual_values (list): List of actual values.
+    
+    Returns:
+    - mse (float): Mean Squared Error.
+    - r2 (float): R² score.
+    """
+    mse = mean_squared_error(actual_values, predicted_values)
+    r2 = r2_score(actual_values, predicted_values)
+    return mse, r2
+
+def calculate_slope_intercept(predicted_values, actual_values):
+    """
+    Calculate the slope and intercept of a linear fit to the scatter plot data.
+    
+    Args:
+    - predicted_values (list): List of predicted values.
+    - actual_values (list): List of actual values.
+    
+    Returns:
+    - slope (float): Slope of the linear fit.
+    - intercept (float): Intercept of the linear fit.
+    """
+    # Perform linear regression (1st degree polynomial fit)
+    slope, intercept = np.polyfit(predicted_values, actual_values, 1)
+    return slope, intercept
+
+def save_slope_intercept_to_file(slope, intercept, output_name):
+    """
+    Save the slope and intercept to a .txt file.
+    
+    Args:
+    - slope (float): Slope of the linear fit.
+    - intercept (float): Intercept of the linear fit.
+    - output_name (str): The base name for the output file.
+    
+    The file will be saved as output_name + "_slope_intercept.txt".
+    """
+    with open(f"{output_name}_slope_intercept.txt", "w") as file:
+        file.write(f"Slope: {slope}\n")
+        file.write(f"Intercept: {intercept}\n")
+
+def save_metrics_to_file(metrics_dict, output_name):
+    """
+    Save the metrics dictionary to a .txt file.
+    
+    Args:
+    - metrics_dict (dict): Dictionary containing metrics to be saved.
+    - output_name (str): The base name for the output file.
+    
+    The file will be saved as output_name + ".txt".
+    """
+    with open(f"{output_name}.txt", "w") as file:
+        for key, value in metrics_dict.items():
+            file.write(f"{key}: {value}\n")
+    return
+
+def calculate_and_save_all_metrics(organized_dict,
+                                   organize_by,
+                                   group_hosts,
+                                   output_name):
+    """
+    Calculate and save metrics like MSE and R², organized by the specified criteria.
+    
+    Args:
+    - organized_dict (dict): The dictionary containing the organized data.
+    - organize_by (str): The criterion by which the data is organized (e.g., 'peptide', 'host').
+    - single_plot (bool): Whether to generate metrics for a single plot or multiple plots.
+    - output_name (str): The base name for the output file.
+    - host (str or None): Host identifier (if applicable).
+    """
+    for filename, data_dict in organized_dict.items():
+        output_name = f"{output_name}_{filename}_{organize_by}"
+        metrics_dict = {}
+
+        if organize_by == 'peptide':
+            for peptide, data_list in data_dict.items():
+                predicted_values = [item['predicted'] for item in data_list]
+                actual_values = [item['actual'] for item in data_list]
+                
+                # Calculate metrics
+                mse, r2 = calculate_metrics(predicted_values, actual_values)
+                slope, intercept = calculate_slope_intercept(predicted_values, actual_values)
+                
+                # Store the metrics
+                metrics_dict[f"Peptide {peptide} MSE"] = mse
+                metrics_dict[f"Peptide {peptide} R²"] = r2
+                metrics_dict[f"Peptide {peptide} Slope"] = slope
+                metrics_dict[f"Peptide {peptide} Intercept"] = intercept
+        
+        elif organize_by == 'host':
+            if group_hosts:
+                grouped_data = {}
+                for host, data_list in data_dict.items():
+                    host_group = host[0]
+                    if host_group not in grouped_data:
+                        grouped_data[host_group] = []
+                    grouped_data[host_group].extend(data_list)
+                
+                for host_group, data_list in grouped_data.items():
+                    predicted_values = [item['predicted'] for item in data_list]
+                    actual_values = [item['actual'] for item in data_list]
+                    
+                    # Calculate metrics for the grouped hosts
+                    mse, r2 = calculate_metrics(predicted_values, actual_values)
+                    slope, intercept = calculate_slope_intercept(predicted_values, actual_values)
+                    
+                    # Store the metrics
+                    metrics_dict[f"Host Group {host_group} MSE"] = mse
+                    metrics_dict[f"Host Group {host_group} R²"] = r2
+                    metrics_dict[f"Host Group {host_group} Slope"] = slope
+                    metrics_dict[f"Host Group {host_group} Intercept"] = intercept
+            else:
+                for host, data_list in data_dict.items():
+                    predicted_values = [item['predicted'] for item in data_list]
+                    actual_values = [item['actual'] for item in data_list]
+                    
+                    # Calculate metrics for individual hosts
+                    mse, r2 = calculate_metrics(predicted_values, actual_values)
+                    slope, intercept = calculate_slope_intercept(predicted_values, actual_values)
+                    
+                    # Store the metrics
+                    metrics_dict[f"Host {host} MSE"] = mse
+                    metrics_dict[f"Host {host} R²"] = r2
+                    metrics_dict[f"Host {host} Slope"] = slope
+                    metrics_dict[f"Host {host} Intercept"] = intercept
+
+        # Save metrics and fit results to file
+        save_metrics_to_file(metrics_dict, output_name)
+    
+    return
+
 def multi_scatter_plot(pickle_file_folder,
-                       list_of_pickle_files,
-                       translation_dict,
-                       plot_setting_dict,
-                       organize_by,
-                       single_plots=True,
-                       output_name=None,
-                       save_fig=False):
+                    list_of_pickle_files,
+                    file_setting_dict,
+                    calix_setting_dict,
+                    peptide_setting_dict,
+                    default_setting_dict,
+                    plot_setting_dict,
+                    organize_by,
+                    single_plot=True,
+                    output_name=None,
+                    save_fig=False,
+                    calculate_metrics=False,
+                    group_hosts=False):
     """
     A function that takes a translation dictionary, which has information about which files to
     access, and how each of these files should appear on the plot (has information about scatter
@@ -96,14 +272,6 @@ def multi_scatter_plot(pickle_file_folder,
     the distinction made in organize_by should be reflected in the *shape of the points*. Colors are set in the
     translation_dict.
     """
-
-    # Set up the figure
-    plt.figure(figsize=(plot_setting_dict['fig_width'], plot_setting_dict['fig_height']))
-    plt.xlabel(plot_setting_dict['x_label'], fontsize=plot_setting_dict['axis_font_size'])
-    plt.ylabel(plot_setting_dict['y_label'], fontsize=plot_setting_dict['axis_font_size'])
-    plt.xticks(fontsize=plot_setting_dict['tick_font_size'])
-    plt.yticks(fontsize=plot_setting_dict['tick_font_size'])
-    plt.title(plot_setting_dict['title'], fontsize=plot_setting_dict['title_font_size'])
 
     # Loop through the translation dictionary and plot each file, respecting organize_by and single_plots
     # The translation dictionary contains the relationship between file name and what should appear in plot legend
@@ -128,15 +296,23 @@ def multi_scatter_plot(pickle_file_folder,
 
     if organize_by == 'none':
             # Extract the data to plot
-            print(organized_dict['all'])
             predicted_values = [item['predicted'] for item in organized_dict['all']]
             actual_values = [item['actual'] for item in organized_dict['all']]
 
             # Extract the plot settings from translation_dict
-            color = translation_dict['all'].get('color', 'blue')
-            size = translation_dict['all'].get('size', 50)
-            opacity = translation_dict['all'].get('opacity', 0.7)
-            marker = translation_dict['all'].get('marker', 'o')
+            color = default_setting_dict['color']
+            size = default_setting_dict['size']
+            opacity = default_setting_dict['opacity']
+            marker = default_setting_dict['marker']
+
+            # Set up the figure
+            plt.figure(figsize=(plot_setting_dict['fig_width'], plot_setting_dict['fig_height']))
+            plt.xlabel(plot_setting_dict['x_label'], fontsize=plot_setting_dict['axis_font_size'])
+            plt.ylabel(plot_setting_dict['y_label'], fontsize=plot_setting_dict['axis_font_size'])
+            plt.xticks(fontsize=plot_setting_dict['tick_font_size'])
+            plt.yticks(fontsize=plot_setting_dict['tick_font_size'])
+            plt.title(plot_setting_dict['title'], fontsize=plot_setting_dict['title_font_size'])
+
 
             # Create the scatter plot
             plt.scatter(predicted_values, actual_values, color=color, s=size, alpha=opacity, marker=marker)
@@ -151,7 +327,203 @@ def multi_scatter_plot(pickle_file_folder,
                 plt.savefig(output_name, bbox_inches='tight')
             else:
                 plt.show()        
-    # Currently working here **********
+    
+    elif organize_by == 'peptide':
+        if calculate_metrics == True:
+            calculate_and_save_all_metrics(organized_dict,
+                                           organize_by,
+                                           single_plot,
+                                           output_name)
+        if single_plot:
+            all_predicted_values = []
+            all_actual_values = []
+            # Set up the figure
+            plt.figure(figsize=(plot_setting_dict['fig_width'], plot_setting_dict['fig_height']))
+            plt.xlabel(plot_setting_dict['x_label'], fontsize=plot_setting_dict['axis_font_size'])
+            plt.ylabel(plot_setting_dict['y_label'], fontsize=plot_setting_dict['axis_font_size'])
+            plt.xticks(fontsize=plot_setting_dict['tick_font_size'])
+            plt.yticks(fontsize=plot_setting_dict['tick_font_size'])
+            plt.title(plot_setting_dict['title'], fontsize=plot_setting_dict['title_font_size'])
+
+        # Iterate over each file
+        for file, data_dict in organized_dict.items():
+            # Iterate over each peptide
+            for peptide, data_list in data_dict.items():
+                # Extract the predicted and actual values for this peptide
+                predicted_values = [item['predicted'] for item in data_list]
+                actual_values = [item['actual'] for item in data_list]
+
+                # Extract the plot settings from translation_dict for this peptide
+                color = get_plot_setting('color',
+                                         file_name=file,
+                                         peptide_name=peptide,
+                                         file_setting_dict=file_setting_dict,
+                                         peptide_setting_dict=peptide_setting_dict,
+                                         default_setting_dict=default_setting_dict)
+                size = get_plot_setting('size',
+                                        file_name=file,
+                                        peptide_name=peptide,
+                                        file_setting_dict=file_setting_dict,
+                                        peptide_setting_dict=peptide_setting_dict,
+                                        default_setting_dict=default_setting_dict)
+                opacity = get_plot_setting('opacity',
+                                             file_name=file,
+                                             peptide_name=peptide,
+                                             file_setting_dict=file_setting_dict,
+                                             peptide_setting_dict=peptide_setting_dict,
+                                             default_setting_dict=default_setting_dict)
+                marker = get_plot_setting('marker',
+                                            file_name=file,
+                                            peptide_name=peptide,
+                                            file_setting_dict=file_setting_dict,
+                                            peptide_setting_dict=peptide_setting_dict,
+                                            default_setting_dict=default_setting_dict)
+
+                if single_plot:
+                    # If single_plot is True, plot all peptides on the same figure
+                    plt.scatter(predicted_values, actual_values, color=color, s=size, alpha=opacity, marker=marker, label=peptide)
+
+                    # Add a diagonal line for reference for the single plot
+                    all_predicted_values = all_predicted_values + predicted_values
+                    all_actual_values = all_actual_values + actual_values
+
+                else:
+                    # If single_plot is False, create a new figure for each peptide
+                    plt.figure()
+                    plt.scatter(predicted_values, actual_values, color=color, s=size, alpha=opacity, marker=marker)
+
+                    # Add a diagonal line for reference (optional)
+                    plt.plot([min(predicted_values), max(predicted_values)], 
+                            [min(predicted_values), max(predicted_values)], 
+                            color='black', linestyle='--', linewidth=1)
+
+                    plt.title(f'Scatter Plot for {peptide}')
+                    plt.xlabel('Predicted Values')
+                    plt.ylabel('Actual Values')
+                    plt.grid(True)
+
+                    # Show or save the figure
+                    if save_fig:
+                        plt.savefig(f"{output_name}_{peptide}.png", bbox_inches='tight')
+                    else:
+                        plt.show()
+        if single_plot:
+            plt.plot([min(all_predicted_values), max(all_predicted_values)], 
+                    [min(all_actual_values), max(all_actual_values)], 
+                    color='black', linestyle='--', linewidth=1)
+
+            plt.legend(title='Peptide')
+            plt.xlabel('Predicted Values')
+            plt.ylabel('Actual Values')
+            plt.title('Scatter Plot for All Peptides')
+            plt.grid(True)
+            # Show or save the figure
+            if save_fig:
+                plt.savefig(output_name, bbox_inches='tight')
+            else:
+                plt.show()
+
+    elif organize_by == 'host':
+        if calculate_metrics == True:
+            calculate_and_save_all_metrics(organized_dict,
+                                           organize_by,
+                                           single_plot,
+                                           output_name)
+        if single_plot:
+            # Initialize a set to track labels that have already been added to the legend
+            seen_labels = set()
+
+            all_predicted_values = []
+            all_actual_values = []
+            # Set up the figure
+            plt.figure(figsize=(plot_setting_dict['fig_width'], plot_setting_dict['fig_height']))
+            plt.xlabel(plot_setting_dict['x_label'], fontsize=plot_setting_dict['axis_font_size'])
+            plt.ylabel(plot_setting_dict['y_label'], fontsize=plot_setting_dict['axis_font_size'])
+            plt.xticks(fontsize=plot_setting_dict['tick_font_size'])
+            plt.yticks(fontsize=plot_setting_dict['tick_font_size'])
+            plt.title(plot_setting_dict['title'], fontsize=plot_setting_dict['title_font_size'])
+
+        # Iterate over each file
+        for file, data_dict in organized_dict.items():
+            # Iterate over each peptide
+            for host, data_list in data_dict.items():
+                # Extract the predicted and actual values for this peptide
+                predicted_values = [item['predicted'] for item in data_list]
+                actual_values = [item['actual'] for item in data_list]
+
+                # Extract the plot settings from translation_dict for this peptide
+                color = get_plot_setting('color',
+                                         file_name=file,
+                                         calix_name=host,
+                                         file_setting_dict=file_setting_dict,
+                                         calix_setting_dict=calix_setting_dict,
+                                         default_setting_dict=default_setting_dict)
+                size = get_plot_setting('size',
+                                        file_name=file,
+                                        calix_name=host,
+                                        file_setting_dict=file_setting_dict,
+                                        calix_setting_dict=calix_setting_dict,
+                                        default_setting_dict=default_setting_dict)
+                opacity = get_plot_setting('opacity',
+                                             file_name=file,
+                                             calix_name=host,
+                                             file_setting_dict=file_setting_dict,
+                                             calix_setting_dict=calix_setting_dict,
+                                             default_setting_dict=default_setting_dict)
+                marker = get_plot_setting('marker',
+                                            file_name=file,
+                                            calix_name=host,
+                                            file_setting_dict=file_setting_dict,
+                                            calix_setting_dict=calix_setting_dict,
+                                            default_setting_dict=default_setting_dict)
+
+                if single_plot:
+                    # If single_plot is True, plot all calixarenes on the same figure
+                    if host[0] not in seen_labels:
+                        plt.scatter(predicted_values, actual_values, color=color, s=size, alpha=opacity, marker=marker, label=host[0])
+                        seen_labels.add(host[0])
+                    else:
+                        # Plot without adding to the legend if the label has already been seen
+                        plt.scatter(predicted_values, actual_values, color=color, s=size, alpha=opacity, marker=marker)
+
+                    all_predicted_values = all_predicted_values + predicted_values
+                    all_actual_values = all_actual_values + actual_values
+
+                else:
+                    # If single_plot is False, create a new figure for each peptide
+                    plt.figure()
+                    plt.scatter(predicted_values, actual_values, color=color, s=size, alpha=opacity, marker=marker)
+
+                    # Add a diagonal line for reference (optional)
+                    plt.plot([min(predicted_values), max(predicted_values)], 
+                            [min(predicted_values), max(predicted_values)], 
+                            color='black', linestyle='--', linewidth=1)
+
+                    plt.title(f'Scatter Plot for {host}')
+                    plt.xlabel('Predicted Values')
+                    plt.ylabel('Actual Values')
+                    plt.grid(True)
+
+                    # Show or save the figure
+                    if save_fig:
+                        plt.savefig(f"{output_name}_{host}.png", bbox_inches='tight')
+                    else:
+                        plt.show()
+        if single_plot:
+            plt.plot([min(all_predicted_values), max(all_predicted_values)], 
+                    [min(all_actual_values), max(all_actual_values)], 
+                    color='black', linestyle='--', linewidth=1)
+
+            plt.legend(title='Peptide')
+            plt.xlabel('Predicted Values')
+            plt.ylabel('Actual Values')
+            plt.title('Scatter Plot for All Peptides')
+            plt.grid(True)
+            # Show or save the figure
+            if save_fig:
+                plt.savefig(output_name, bbox_inches='tight')
+            else:
+                plt.show()   
     return
 
 
