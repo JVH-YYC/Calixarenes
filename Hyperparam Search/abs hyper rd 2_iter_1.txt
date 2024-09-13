@@ -1,3 +1,0 @@
-Best hyperparameters: (0.00067, [2, 3, 2, 3], 0.15)
-Test loss: tensor(3.4448, dtype=torch.float64)
-Test calixarenes: ['AH6', 'BP1', 'CP1', 'DP2', 'E3', 'F4']

@@ -18,8 +18,10 @@ import seaborn as sns
 import pickle
 import numpy as np
 import pandas as pd
+import statistics
 
 from sklearn.metrics import roc_curve, auc, r2_score, mean_squared_error
+from scipy.stats import pearsonr
 
 def load_result_dict(result_folder,
                      result_filename):
@@ -108,6 +110,9 @@ def get_plot_setting(setting_key,
 def calculate_metrics(predicted_values, actual_values):
     """
     Calculate Mean Squared Error (MSE) and R² for given predicted and actual values.
+
+    Also, uses the home-made metric of 'adjusted R2' to give an idea of when a relative trend was captured,
+    but there was a systematic error
     
     Args:
     - predicted_values (list): List of predicted values.
@@ -119,7 +124,24 @@ def calculate_metrics(predicted_values, actual_values):
     """
     mse = mean_squared_error(actual_values, predicted_values)
     r2 = r2_score(actual_values, predicted_values)
-    return mse, r2
+    adjusted_r2, shift_amount = calculate_adjusted_r2(actual_values, predicted_values)
+    return mse, r2, adjusted_r2, shift_amount
+
+def calculate_adjusted_r2(predicted_values, actual_values):
+    """
+    Calculates the 'best' possible R2 if all predictions are adjusted by the mean systematic error
+    Returns that R2 value, as well as the amout of shift that was applied
+    """
+
+    mean_adj_list = [a - b for a, b in zip(actual_values, predicted_values)]
+
+    systematic_error = statistics.mean(mean_adj_list)
+
+    adjusted_pred_values = [a + systematic_error for a in predicted_values]
+
+    adjusted_r2 = r2_score(actual_values, adjusted_pred_values)
+
+    return adjusted_r2, systematic_error     
 
 def calculate_slope_intercept(predicted_values, actual_values):
     """
@@ -187,18 +209,16 @@ def calculate_and_save_all_metrics(organized_dict,
 
         if organize_by == 'peptide':
             for peptide, data_list in data_dict.items():
-                predicted_values = [item['predicted'] for item in data_list]
-                actual_values = [item['actual'] for item in data_list]
-                
+                predicted_values = [item['predicted'][0] if isinstance(item['predicted'], list) else item['predicted'] for item in data_list]
+                actual_values = [item['actual'][0] if isinstance(item['actual'], list) else item['actual'] for item in data_list]                
                 # Calculate metrics
-                mse, r2 = calculate_metrics(predicted_values, actual_values)
-                slope, intercept = calculate_slope_intercept(predicted_values, actual_values)
+                mse, r2, adjusted_r2, systematic_error = calculate_metrics(predicted_values, actual_values)
                 
                 # Store the metrics
                 metrics_dict[f"Peptide {peptide} MSE"] = mse
                 metrics_dict[f"Peptide {peptide} R²"] = r2
-                metrics_dict[f"Peptide {peptide} Slope"] = slope
-                metrics_dict[f"Peptide {peptide} Intercept"] = intercept
+                metrics_dict[f"Peptide {peptide} Adjusted R²"] = adjusted_r2
+                metrics_dict[f"Peptide {peptide} Systematic Error"] = systematic_error
         
         elif organize_by == 'host':
             if group_hosts:
@@ -210,32 +230,30 @@ def calculate_and_save_all_metrics(organized_dict,
                     grouped_data[host_group].extend(data_list)
                 
                 for host_group, data_list in grouped_data.items():
-                    predicted_values = [item['predicted'] for item in data_list]
-                    actual_values = [item['actual'] for item in data_list]
+                    predicted_values = [item['predicted'][0] if isinstance(item['predicted'], list) else item['predicted'] for item in data_list]
+                    actual_values = [item['actual'][0] if isinstance(item['actual'], list) else item['actual'] for item in data_list]                
                     
                     # Calculate metrics for the grouped hosts
-                    mse, r2 = calculate_metrics(predicted_values, actual_values)
-                    slope, intercept = calculate_slope_intercept(predicted_values, actual_values)
+                    mse, r2, adjusted_r2, systematic_error = calculate_metrics(predicted_values, actual_values)
                     
                     # Store the metrics
                     metrics_dict[f"Host Group {host_group} MSE"] = mse
                     metrics_dict[f"Host Group {host_group} R²"] = r2
-                    metrics_dict[f"Host Group {host_group} Slope"] = slope
-                    metrics_dict[f"Host Group {host_group} Intercept"] = intercept
+                    metrics_dict[f"Host Group {host_group} Adjusted R²"] = adjusted_r2
+                    metrics_dict[f"Host Group {host_group} Systematic Error"] = systematic_error
             else:
                 for host, data_list in data_dict.items():
-                    predicted_values = [item['predicted'] for item in data_list]
-                    actual_values = [item['actual'] for item in data_list]
+                    predicted_values = [item['predicted'][0] if isinstance(item['predicted'], list) else item['predicted'] for item in data_list]
+                    actual_values = [item['actual'][0] if isinstance(item['actual'], list) else item['actual'] for item in data_list]                
                     
                     # Calculate metrics for individual hosts
-                    mse, r2 = calculate_metrics(predicted_values, actual_values)
-                    slope, intercept = calculate_slope_intercept(predicted_values, actual_values)
+                    mse, r2, adjusted_r2, systematic_error = calculate_metrics(predicted_values, actual_values)
                     
                     # Store the metrics
                     metrics_dict[f"Host {host} MSE"] = mse
                     metrics_dict[f"Host {host} R²"] = r2
-                    metrics_dict[f"Host {host} Slope"] = slope
-                    metrics_dict[f"Host {host} Intercept"] = intercept
+                    metrics_dict[f"Host {host} Adjusted R²"] = adjusted_r2
+                    metrics_dict[f"Host {host} Systematic Error"] = systematic_error
 
         # Save metrics and fit results to file
         save_metrics_to_file(metrics_dict, output_name)

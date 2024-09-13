@@ -1,0 +1,8 @@
+Best hyperparameters: (0.001, [2, 3, 3, 4], 0.03)
+Test loss: tensor(2.6908, dtype=torch.float64)
+Test calixarenes: ['AP4', 'AH6', 'AM2', 'CP1', 'F3', 'E3']
+
+Rd_1 hyper also competitive with [2, 2, 4, 4] w similar computational cost
+NB: dropout results in strange train/valid behavior - test 0.0 dropout [2,2,2,2] (ie CDK settings) via LOO
+
+Compare with above, but with dropout at 0.01 rather than 0.03, as well as round 1 hyper search

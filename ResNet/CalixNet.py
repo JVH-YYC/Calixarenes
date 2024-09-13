@@ -487,8 +487,7 @@ def train_network(network,
                   learning_rate,
                   absolute_training,
                   absolute_predictions,
-                  save_model,
-                  save_test_dictionary):
+                  save_model):
     """
     Training loop for network training, including early stopping, data logging,
     and figure generation for review.
@@ -955,11 +954,9 @@ def random_calix_hyper_search(num_searches,
     a_calix = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6', 'AP7',
                'AP8', 'AP9', 'AM1', 'AM2', 'AH1', 'AH2',
                'AH5', 'AH6', 'AH7', 'AO1', 'AO2', 'AO3']
-    b_calix = ['BP0', 'BP1', 'BM1', 'BH2']
-    c_calix = ['CP1', 'CP2']
-    d_calix = ['DP2', 'DM1', 'DO2', 'DO3']
+    bc_calix = ['BP0', 'BP1', 'BM1', 'BH2', 'CP1', 'CP2',]
+    df_calix = ['DP2', 'DM1', 'DO2', 'DO3', 'F2', 'F3', 'F4']
     e_calix = ['E1', 'E3', 'E6', 'E7', 'E8', 'E11']
-    f_calix = ['F2', 'F3', 'F4']
 
     training_log_dict = {}
     current_iteration = 0
@@ -970,12 +967,7 @@ def random_calix_hyper_search(num_searches,
         current_iteration = current_iteration + 1
         current_output_name = output_name + '_iter_' + str(current_iteration)
         good_start = False
-        test_calix_list = [random.choice(a_calix),
-                           random.choice(b_calix),
-                           random.choice(c_calix),
-                           random.choice(d_calix),
-                           random.choice(e_calix),
-                           random.choice(f_calix)]
+        test_calix_list = random.sample(a_calix, 3)+ [random.choice(bc_calix)] + [random.choice(df_calix)] + [random.choice(e_calix)]
         while good_start == False:
             current_lr = random.choice(learning_rate_list)
             curr_resnet = random.choice(resnet_block_list)
@@ -1348,7 +1340,8 @@ def single_abs_test_pass(network,
                 cal_name = dataset_obj.test_calix[example]
                 peptide_tens = dataset_obj.one_hot_tags[dataset_obj.test_peptides[example]]
                 peptide_name = dataset_obj.test_peptides[example]
-                target_value = dataset_obj.absolute_ads_val.loc[cal_name, peptide_name]
+                # Target value is log of the absolute adsorption
+                target_value = np.log(dataset_obj.absolute_ads_val.loc[cal_name, peptide_name])
 
                 # Append to batch lists
                 batch_cal_tens.append(cal_tens)
@@ -1475,7 +1468,7 @@ def compile_predicted_actual_LOO_dict(model_translation_dict,
                                                 one_hot_file=one_hot_file,
                                                 exclude_calix=exclude_calix,
                                                 test_set=[calix_host],
-                                                training_batch_size=batch_size)
+                                                training_batch_size=training_batch_size)
             
         if absolute_predictions == True:
             ### Will iterate through the test set, as the predictions go straight into
