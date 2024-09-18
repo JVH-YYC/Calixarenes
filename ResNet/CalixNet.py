@@ -63,7 +63,8 @@ class ResNet(nn.Module):
                  res_block,
                  blocks_per_layer,
                  dropout,
-                 input_channels):
+                 input_channels,
+                 classification):
         super(ResNet, self).__init__()
         self.working_inp_channel = 64
         self.beg_conv1 = nn.Conv3d(input_channels, 64, kernel_size=7, stride=2, padding=3)
@@ -71,6 +72,7 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
         self.dropout = nn.Dropout(dropout)
+        self.classification = classification
 
         #ResNet type layers
         self.res_layer1 = self.create_block(ResBlock, blocks_per_layer[0], out_channels=64, stride=2)
@@ -87,6 +89,8 @@ class ResNet(nn.Module):
         self.fc3 = nn.Linear(531, 1)
 
     def forward(self, in_tensor, peptide_tensor):
+        in_tensor = in_tensor.float()
+        peptide_tensor = peptide_tensor.float()
         in_tensor = self.beg_conv1(in_tensor)
         in_tensor = self.beg_conv1_bn(in_tensor)
         in_tensor = self.relu(in_tensor)
@@ -107,6 +111,9 @@ class ResNet(nn.Module):
         in_tensor = self.relu(in_tensor)
         in_tensor = self.dropout(self.fc3(in_tensor))
         
+        if self.classification == True:
+            in_tensor = torch.sigmoid(in_tensor)
+
         return in_tensor
 
     def create_block(self,
@@ -139,11 +146,13 @@ class ResNet(nn.Module):
 
 def ResNet18(input_block_list,
              dropout_amount,
-             input_channels=4):
+             input_channels=4,
+             classification=False):
     return ResNet(ResBlock,
                   input_block_list,
                   dropout_amount,
-                  input_channels)
+                  input_channels,
+                  classification)
 
         
 class RelativeAdsorptionDataset(Dataset):
@@ -341,6 +350,7 @@ def load_trained_model(state_dict_directory,
                        state_dict_name,
                        input_block_list,
                        dropout_amount,
+                       classification=False,
                        device='cuda'):
     """
     Function to re-load a previously trained model from a state dictionary file
@@ -349,7 +359,9 @@ def load_trained_model(state_dict_directory,
     """
 
     model = ResNet18(input_block_list,
-                     dropout_amount)
+                     dropout_amount,
+                     4,
+                     classification)
     model = model.float()
     state_dict = torch.load(state_dict_directory + state_dict_name, map_location=device)
 
@@ -415,7 +427,8 @@ def val_train_indices(dataset,
 
 def loss_and_optim(network,
                     learning_rate,
-                    lr_patience=30):
+                    lr_patience=30,
+                    classification=False):
     """
     Creates Pytorch loss function and optimizer
 
@@ -432,7 +445,10 @@ def loss_and_optim(network,
 
     """
     
-    loss_function = nn.MSELoss()
+    if classification == False:
+        loss_function = nn.MSELoss()
+    else:
+        loss_function = nn.BCELoss()
 
     optimize = optim.Adam(network.parameters(),
                           lr=learning_rate)
@@ -485,9 +501,11 @@ def train_network(network,
                   min_epochs,
                   training_epochs,
                   learning_rate,
+                  lr_patience,
                   absolute_training,
                   absolute_predictions,
-                  save_model):
+                  save_model,
+                  classification):
     """
     Training loop for network training, including early stopping, data logging,
     and figure generation for review.
@@ -563,7 +581,10 @@ def train_network(network,
 
     num_batches = len(train_loader)
         
-    loss_func, optimize, lr_sched = loss_and_optim(network, learning_rate)
+    loss_func, optimize, lr_sched = loss_and_optim(network,
+                                                   learning_rate,
+                                                   lr_patience,
+                                                   classification)
 
     training_start = time.time()
 
@@ -646,6 +667,8 @@ def train_network(network,
             
                 #Forward pass only
                 val_output = network(inputs, peptide_tens)
+                val_output = val_output.float()
+                target_values = target_values.float()
                 val_loss_size = loss_func(val_output, target_values)
                 total_val_loss += float(val_loss_size.item())
             if epoch % 10 == 0:
@@ -697,7 +720,7 @@ def train_network(network,
                 
                 abs_test_pred, abs_test_act = extract_predicted_actual(predict_dict)
 
-                test_loss = loss_func(torch.tensor(abs_test_pred), torch.tensor(abs_test_act))
+                test_loss = loss_func(torch.tensor(abs_test_pred).float(), torch.tensor(abs_test_act).float())
 
             return training_log, test_loss
 
@@ -733,7 +756,7 @@ def train_network(network,
 
         abs_test_pred, abs_test_act = extract_predicted_actual(test_pred_dict)
 
-        test_loss = loss_func(torch.tensor(abs_test_pred), torch.tensor(abs_test_act))
+        test_loss = loss_func(torch.tensor(abs_test_pred).float(), torch.tensor(abs_test_act).float())
     
     return training_log, test_loss
 
@@ -750,11 +773,13 @@ def cnn_work_flow(pq_file_directory,
                   min_epochs,
                   training_epochs,
                   learning_rate,
+                  lr_patience,
                   resnet_block_list,
                   dropout_amount,
                   absolute_training,
                   absolute_predictions,
-                  save_model):
+                  save_model,
+                  classification):
     """
     Work flow that creates network and trains it.
     Returns the training log file for plotting
@@ -805,7 +830,8 @@ def cnn_work_flow(pq_file_directory,
     """
     network = ResNet18(resnet_block_list,
                        dropout_amount,
-                       4)
+                       4,
+                       classification)
     
     network = network.float()
     
@@ -823,9 +849,11 @@ def cnn_work_flow(pq_file_directory,
                                   min_epochs,
                                   training_epochs,
                                   learning_rate,
+                                  lr_patience,
                                   absolute_training,
                                   absolute_predictions,
-                                  save_model)
+                                  save_model,
+                                  classification)
     
     return training_log, network, test_loss
 
@@ -941,12 +969,14 @@ def random_calix_hyper_search(num_searches,
                               min_epochs,
                               training_epochs,
                               learning_rate_list,
+                              lr_patience,
                               dropout_amount_list,
                               resnet_block_list,
                               absolute_training,
                               absolute_predictions,
                               save_all_models,
-                              save_best_model):
+                              save_best_model,
+                              classification):
     """
     Function that randomly selects hyperparameters for training a network
     """
@@ -990,11 +1020,13 @@ def random_calix_hyper_search(num_searches,
                                                 min_epochs=min_epochs,
                                                 training_epochs=training_epochs,
                                                 learning_rate=current_lr,
+                                                lr_patience=lr_patience,
                                                 resnet_block_list=curr_resnet,
                                                 dropout_amount=curr_dropout,
                                                 absolute_training=absolute_training,
                                                 absolute_predictions=absolute_predictions,
-                                                save_model=save_all_models)
+                                                save_model=save_all_models,
+                                                classification=classification)
         training_log_dict[current_output_name] = current_training_log
         print('Iteration finished with test loss of:', current_test_loss)
 
@@ -1198,7 +1230,8 @@ def single_test_pass(network,
 
 def single_abs_test_pass(network,
                          dataset_obj,
-                         absolute_training):
+                         absolute_training,
+                         classification=False):
     """
     Takes a trained network and runs a forward pass on the test set
 
@@ -1430,7 +1463,8 @@ def compile_predicted_actual_LOO_dict(model_translation_dict,
                                       dropout_amount,
                                       absolute_training,
                                       absolute_predictions,
-                                      output_name):
+                                      output_name,
+                                      classification):
     """
     A function that takes as an input a dictionary, where the dictionary
     keys are all calixarene hosts to be investigated ('AP8', 'BM2', etc.)
@@ -1450,7 +1484,8 @@ def compile_predicted_actual_LOO_dict(model_translation_dict,
         model = load_trained_model(model_translation_dict[calix_host][0],
                                    model_translation_dict[calix_host][1],
                                    input_block_list,
-                                   dropout_amount)
+                                   dropout_amount,
+                                   classification)
         if absolute_training == False:
             adsorption_data = RelativeAdsorptionDataset(pq_file_directory=pq_file_directory,
                                                 pq_file_name=pq_file_name,
@@ -1475,7 +1510,8 @@ def compile_predicted_actual_LOO_dict(model_translation_dict,
             ### the dictionary to be returned
             curr_result_dict = single_abs_test_pass(model,
                                                     adsorption_data,
-                                                    absolute_training)
+                                                    absolute_training,
+                                                    classification)
             prediction_dict.update(curr_result_dict)
 
     #Pickle the dictionary for future plotting

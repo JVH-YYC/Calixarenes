@@ -1,0 +1,3 @@
+Best hyperparameters: (3.3e-05, [2, 2, 2, 2], 0.05)
+Test loss: tensor(0.6536)
+Test calixarenes: ['AH7', 'AM1', 'AP6', 'CP1', 'DO3', 'E8']
