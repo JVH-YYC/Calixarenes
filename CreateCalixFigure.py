@@ -88,7 +88,7 @@ calix_setting_dict = {'A': {'color': 'blue',
                                 'size': 25}}
                             
 VCV.multi_scatter_plot(pickle_file_folder='Results Dictionaries/',
-                       list_of_pickle_files=['GCN_regression.pkl',],
+                       list_of_pickle_files=['Rel CNN No F.pkl',],
                        file_setting_dict=file_setting_dict,
                        calix_setting_dict=calix_setting_dict,
                        peptide_setting_dict=peptide_setting_dict,
@@ -96,7 +96,7 @@ VCV.multi_scatter_plot(pickle_file_folder='Results Dictionaries/',
                        plot_setting_dict=plot_setting_dict,
                        organize_by='host',
                        single_plot=False,
-                       output_name='GCN Regression LOO',
+                       output_name='Rel CNN No F',
                        save_fig=False,
                        calculate_metrics=True,
                        group_hosts=True)

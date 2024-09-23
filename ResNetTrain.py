@@ -13,37 +13,34 @@ import ResNet.CalixNet as CNN
 import DataLoaders.CDKDataLoader as CDL
 
 # Initial training of the network
-# initial_calix_list = ['E11', 'BH2', 'BP0', 'AH2', 'AH1',
-#                       'DM1', 'BM1', 'AM2', 'AM1', 'DP2',
-#                       'CP2', 'CP1', 'BP1', 'PNO2', 'PSC4',
-#                       'F4', 'AP9', 'F3', 'AP8', 'F2', 'AP7',
-#                       'AP6', 'E8', 'AP5', 'E7', 'AP4', 'E6',
-#                       'AP3', 'E3', 'AP1', 'E1', 'DO3', 'DO2',
-#                       'AO3', 'AO2', 'AO1', 'AH7', 'AH6', 'AH5']
+initial_calix_list = ['E11', 'BH2', 'BP0', 'AH2', 'AH1',
+                      'DM1', 'BM1', 'AM2', 'AM1', 'DP2',
+                      'CP2', 'CP1', 'BP1', 'PNO2', 'PSC4',
+                      'AH4', 'AP9', 'AH3', 'AP8', 'AP7',
+                      'AP6', 'E8', 'AP5', 'E7', 'AP4', 'E6',
+                      'AP3', 'E3', 'AP1', 'E1', 'DO3', 'DO2',
+                      'AO3', 'AO2', 'AO1', 'AH7', 'AH6', 'AH5']
 
-# Forgot two calix in first batch
-missing_calix_list = ['AH4', 'AH3']
-
-for calix in missing_calix_list:
+for calix in initial_calix_list:
     print('Processing calixarene:', calix)
     pq_file_directory = 'PQFiles'
     pq_file_name = 'AlokThesis10A_Comb.pq'
     csv_file_directory = 'CSVFiles'
     binding_file = 'Data excluding non-binders.csv'
     one_hot_file = 'one_hot_short.csv'
-    exclude_calix = ['E9',]
+    exclude_calix = ['E9', 'F2', 'F3', 'F4']
     test_set = [calix,]
-    output_name ='Final LOO Abs Train ' + calix
+    output_name ='Rel LOO no F ' + calix
     batch_size = 400
     val_split = 0.1
     min_epochs = 100
     training_epochs = 400
-    learning_rate = 0.000067
+    learning_rate = 0.00033
     lr_patience = 30
-    resnet_block_list = [3,3,3,3]
-    dropout_amount = 0.04
-    absolute_training = True
-    absolute_predictions = True
+    resnet_block_list = [2,2,3,4]
+    dropout_amount = 0.3
+    absolute_training = False
+    absolute_predictions = False
     classification = False
     # state_dict_directory = '/home/jvh/Desktop/Trained Calix ResNets/'
     # state_dict_name = 'First Inverse Training E_iter_0.pt'
