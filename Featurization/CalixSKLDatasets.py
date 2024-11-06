@@ -151,7 +151,7 @@ def create_loo_relative_ecfp_dictionary(calixarene_csv_folder,
     target_columns = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
 
     # Iterate over all combinations of two different hosts
-    for (idx1, row1), (idx2, row2) in itertools.combinations(calixarene_df.iterrows(), 2):
+    for (idx1, row1), (idx2, row2) in itertools.permutations(calixarene_df.iterrows(), 2):
         host_pair = (row1['Host'], row2['Host'])
         
         if row1['Host'] != holdout_calixarene and row2['Host'] != holdout_calixarene:
@@ -171,10 +171,10 @@ def create_loo_relative_ecfp_dictionary(calixarene_csv_folder,
                                                          'Target_Val': row1[target] - row2[target],
                                                          'Target': target}
                 if row1['Host'] == holdout_calixarene:
-                    calixarene_comparison_dict['test'][key]['holdout_pos'] = 'row1'
+                    calixarene_comparison_dict['test'][key]['test_pos'] = 'row1'
                     calixarene_comparison_dict['test'][key]['known_val'] = row2[target]
                 elif row2['Host'] == holdout_calixarene:
-                    calixarene_comparison_dict['test'][key]['holdout_pos'] = 'row2'
+                    calixarene_comparison_dict['test'][key]['test_pos'] = 'row2'
                     calixarene_comparison_dict['test'][key]['known_val'] = row1[target]
 
     return calixarene_comparison_dict
@@ -427,7 +427,7 @@ def organize_loo_model_input(loo_calix_dataset,
         full_sample_list = []
         full_sample_target_list = []
         if relative_training and dataset_split == 'test':
-            known_calix_position = []
+            test_calix_position = []
             known_calix_value = []
             full_peptide_list = []
 
@@ -443,14 +443,14 @@ def organize_loo_model_input(loo_calix_dataset,
             full_sample_list.append(np.concatenate(feature_list, axis=0))
             full_sample_target_list.append(loo_calix_dataset[dataset_split][example]['Target_Val'])
             if relative_training and dataset_split == 'test':
-                known_calix_position.append(loo_calix_dataset[dataset_split][example]['holdout_pos'])
+                test_calix_position.append(loo_calix_dataset[dataset_split][example]['test_pos'])
                 known_calix_value.append(loo_calix_dataset[dataset_split][example]['known_val'])
                 full_peptide_list.append(loo_calix_dataset[dataset_split][example]['Target'])
 
         calixarene_model_dict[dataset_split]['features'] = np.array(full_sample_list)
         calixarene_model_dict[dataset_split]['target'] = np.array(full_sample_target_list)
         if relative_training and dataset_split == 'test':
-            calixarene_model_dict[dataset_split]['known_pos'] = known_calix_position
+            calixarene_model_dict[dataset_split]['test_pos'] = test_calix_position
             calixarene_model_dict[dataset_split]['known_val'] = known_calix_value
             calixarene_model_dict[dataset_split]['peptide_order'] = full_peptide_list
 

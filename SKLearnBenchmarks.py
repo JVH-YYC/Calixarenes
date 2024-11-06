@@ -447,23 +447,25 @@ def loo_svm_final(calixarene_csv_folder,
             #Organize lists
             actual_values = svi['test']['target']
             predicted_diffs = predictions
-            calix_positions = svi['test']['known_pos']
+            test_calix_positions = svi['test']['test_pos']
             peptide_names = svi['test']['peptide_order']
             known_calix_values = svi['test']['known_val']
 
             # Create lists for storing intermediate results
             loo_int_results[calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
             for actual, predicted_diff, position, peptide_name, known_calix in zip(
-                    actual_values, predicted_diffs, calix_positions, peptide_names, known_calix_values):
+                    actual_values, predicted_diffs, test_calix_positions, peptide_names, known_calix_values):
                 
                 # Calculate the predicted value for the unknown calix
-                if position == 'row2':
-                    predicted_value = predicted_diff + known_calix  
+                if position == 'row1':
+                    predicted_value = predicted_diff + known_calix
+                    act_val = actual + known_calix  
                 else:
-                    predicted_value = -1 * (predicted_diff - known_calix) 
+                    predicted_value = -1 * (predicted_diff - known_calix)
+                    act_val = -1 * (actual - known_calix) 
 
                 # Append the actual and predicted values to the loo_int_results dictionary
-                loo_int_results[calix][peptide_name]['actual'].append(actual)
+                loo_int_results[calix][peptide_name]['actual'].append(act_val)
                 loo_int_results[calix][peptide_name]['predicted'].append(predicted_value)
 
             loo_results[calix] = {name: {'actual': np.mean(loo_int_results[calix][name]['actual']),
@@ -497,14 +499,14 @@ def loo_svm_final(calixarene_csv_folder,
     return loo_results
                                 
 
-calixarene_list = ['AP1', 'AP3',] #'AP4', 'AP5', 'AP6',
-                #    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
-                #    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
-                #    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
-                #    'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
-                #    'CP2', 'DP2', 'DM1', 'DO2', 'DO2', 'DO3',
-                #    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
-                #    'P-NO2', 'PSC4']
+calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
+                   'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+                   'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+                   'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+                   'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
+                   'CP2', 'DP2', 'DM1', 'DO2', 'DO2', 'DO3',
+                   'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+                   'P-NO2', 'PSC4']
 
 # rfi = create_single_split_ECFP_dataset('Featurization/',
 #                                        'calix smiles absolute.csv',
