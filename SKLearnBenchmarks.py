@@ -50,6 +50,50 @@ def create_single_split_ECFP_dataset(calixarene_csv_folder,
     
     return random_forest_input
 
+def create_LOO_absolute_datasets(calixarene_csv_folder,
+                                 calixarene_csv_file,
+                                 peptide_one_hot_encoding,
+                                 holdout_calixarene):
+    """
+    A function related to that directly above, to create leave-one-out datasets for calixarene adsorption data.
+    In this case, absolute target values are used.
+    """
+
+    # Load the data from the .csv file
+    first_calix_dict = CSD.create_loo_ecfp_dictionary(calixarene_csv_folder=calixarene_csv_folder,
+                                                      calixarene_csv_file=calixarene_csv_file,
+                                                      holdout_calixarene=holdout_calixarene)
+    
+    absolute_model_input, peptide_name_list = CSD.organize_loo_model_input(loo_calix_dataset=first_calix_dict,
+                                                       one_hot_encoding_folder=calixarene_csv_folder,
+                                                       peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                       mode='absolute')
+    
+    return absolute_model_input, peptide_name_list
+
+def create_LOO_relative_datasets(calixarene_csv_folder,
+                                 calixarene_csv_file,
+                                 peptide_one_hot_encoding,
+                                 holdout_calixarene,
+                                 method):
+    """
+    A function related to that directly above, to create leave-one-out datasets for calixarene adsorption data.
+    In this case, relative target values are used.
+    """
+
+    # Load the data from the .csv file
+    first_calix_dict = CSD.create_loo_relative_ecfp_dictionary(calixarene_csv_folder=calixarene_csv_folder,
+                                                               calixarene_csv_file=calixarene_csv_file,
+                                                               holdout_calixarene=holdout_calixarene,
+                                                               method=method)
+    
+    relative_model_input, peptide_name_list = CSD.organize_loo_model_input(loo_calix_dataset=first_calix_dict,
+                                                       one_hot_encoding_folder=calixarene_csv_folder,
+                                                       peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                       relative_training=True)
+    
+    return relative_model_input, peptide_name_list
+
 def train_single_random_forest(rfi):
     # Initialize the RandomForestRegressor
     rf = RandomForestRegressor(criterion='squared_error')
@@ -294,6 +338,173 @@ def perform_svm_grid_search(svm_data,
 
     return grid_search.best_params_
 
+def loo_random_forest_final(calixarene_csv_folder,
+                                calixarene_csv_name,
+                                peptide_one_hot_encoding,
+                                calixarene_list,
+                                output_name,
+                                relative_training,
+                                mode,
+                                method,
+                                n_estimators=100,
+                                max_depth=1,
+                                min_samples_split=2,
+                                min_samples_leaf=4,
+                                bootstrap=True):
+    """
+    A function to perform the final leave-one-out cross validation for random forest. With no need for early stopping/paramater tuning,
+    all non-held-out calixarenes are used as the training set.
+
+    Saves predicted/actual results in a dictionary of the typical format, and pickles it for future plotting/processing.
+
+    Results from 10-fold-CV hyperparameter search:
+    Best = Bootstrap Tue, Max_depth 10, min_samples_leaf 4, min_samples_split 2, n_estimators 100
+    Worst = Bootstrap False, Max_depth 50, min_samples_leaf 1, min_samples_split 2, n_estimators 10
+
+    """
+
+    # Initialize the dictionary to hold the results
+    loo_results = {}
+
+    # Loop through each calixarene
+    for calix in calixarene_list:
+        # Create the dataset
+        if relative_training is not None:
+            rfi, peptide_name_list = create_LOO_relative_datasets(calixarene_csv_folder=calixarene_csv_folder,
+                                               calixarene_csv_file=calixarene_csv_name,
+                                               peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                               holdout_calixarene=calix,
+                                               mode=mode)
+        else:
+            rfi, peptide_name_list = create_LOO_absolute_datasets(calixarene_csv_folder=calixarene_csv_folder,
+                                                                  calixarene_csv_file=calixarene_csv_name,
+                                                                  peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                  holdout_calixarene=calix)
+
+            # Initialize the RandomForestRegressor
+            rf = RandomForestRegressor(n_estimators=n_estimators,
+                                    max_depth=max_depth,
+                                    min_samples_split=min_samples_split,
+                                    min_samples_leaf=min_samples_leaf,
+                                    bootstrap=bootstrap)
+
+            # Train on the 'train' split
+            rf.fit(rfi['train']['features'], rfi['train']['target'])
+
+            # Evaluate on 'test' split. Must re-shape the features, as it's a single sample.
+            predictions = rf.predict(rfi['test']['features'])
+            mse = mean_squared_error(rfi['test']['target'], predictions)
+            # Save the results to the dictionary
+            loo_results[calix] = {name: {'actual': rfi['test']['target'][i], 'predicted': predictions[i]} for i, name in enumerate(peptide_name_list)}
+
+    # Save the dictionary to a pickle file
+    with open(output_name, 'wb') as f:
+        pickle.dump(loo_results, f)
+
+    return loo_results
+
+def loo_svm_final(calixarene_csv_folder,
+                                calixarene_csv_name,
+                                peptide_one_hot_encoding,
+                                calixarene_list,
+                                output_name,
+                                relative_training,
+                                method,
+                                C=100,
+                                kernel='rbf',
+                                gamma='scale',
+                                epsilon=0.1):
+    """
+    An equivalent function to the random forest function above. After 10-fold CV hyperparameter searching, the appropriate parameters were found to be:
+    C = 100, epsilon = 0.1, kernel = rbf, gamma = scale
+    """
+    # Initialize the dictionary to hold the results
+    loo_int_results = {}
+    loo_results = {}
+
+    # Loop through each calixarene
+    for calix in calixarene_list:
+        # Create the dataset
+        if relative_training:
+            svi, peptide_name_list = create_LOO_relative_datasets(calixarene_csv_folder=calixarene_csv_folder,
+                                                                  calixarene_csv_file=calixarene_csv_name,
+                                                                  peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                  holdout_calixarene=calix,
+                                                                  method=method)
+            # Initialize the Support Vector Regressor
+            svm = SVR(C=C,
+                    kernel=kernel,
+                    gamma=gamma,
+                    epsilon=epsilon)
+
+            # Train on the 'train' split
+            svm.fit(svi['train']['features'], svi['train']['target'])
+
+            # Evaluate on 'test' split. Must re-shape the features, as it's a single sample.
+            predictions = svm.predict(svi['test']['features'])
+            mse = mean_squared_error(svi['test']['target'], predictions)
+
+            #Organize lists
+            actual_values = svi['test']['target']
+            predicted_diffs = predictions
+            calix_positions = svi['test']['known_pos']
+            peptide_names = svi['test']['peptide_order']
+            known_calix_values = svi['test']['known_val']
+
+            # Create lists for storing intermediate results
+            loo_int_results[calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
+            for actual, predicted_diff, position, peptide_name, known_calix in zip(
+                    actual_values, predicted_diffs, calix_positions, peptide_names, known_calix_values):
+                
+                # Calculate the predicted value for the unknown calix
+                if position == 'row2':
+                    predicted_value = predicted_diff + known_calix  
+                else:
+                    predicted_value = -1 * (predicted_diff - known_calix) 
+
+                # Append the actual and predicted values to the loo_int_results dictionary
+                loo_int_results[calix][peptide_name]['actual'].append(actual)
+                loo_int_results[calix][peptide_name]['predicted'].append(predicted_value)
+
+            loo_results[calix] = {name: {'actual': np.mean(loo_int_results[calix][name]['actual']),
+                                               'predicted': np.mean(loo_int_results[calix][name]['predicted'])} for name in peptide_name_list}
+
+        else:
+            svi, peptide_name_list = create_LOO_absolute_datasets(calixarene_csv_folder=calixarene_csv_folder,
+                                                                  calixarene_csv_file=calixarene_csv_name,
+                                                                  peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                  holdout_calixarene=calix)
+
+            # Initialize the Support Vector Regressor
+            svm = SVR(C=C,
+                    kernel=kernel,
+                    gamma=gamma,
+                    epsilon=epsilon)
+
+            # Train on the 'train' split
+            svm.fit(svi['train']['features'], svi['train']['target'])
+
+            # Evaluate on 'test' split. Must re-shape the features, as it's a single sample.
+            predictions = svm.predict(svi['test']['features'])
+            mse = mean_squared_error(svi['test']['target'], predictions)
+            # Save the results to the dictionary
+            loo_results[calix] = {name: {'actual': svi['test']['target'][i], 'predicted': predictions[i]} for i, name in enumerate(peptide_name_list)}
+
+    # Save the dictionary to a pickle file
+    with open(output_name, 'wb') as f:
+        pickle.dump(loo_results, f)
+
+    return loo_results
+                                
+
+calixarene_list = ['AP1', 'AP3',] #'AP4', 'AP5', 'AP6',
+                #    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+                #    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+                #    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+                #    'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
+                #    'CP2', 'DP2', 'DM1', 'DO2', 'DO2', 'DO3',
+                #    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+                #    'P-NO2', 'PSC4']
 
 # rfi = create_single_split_ECFP_dataset('Featurization/',
 #                                        'calix smiles absolute.csv',
@@ -310,23 +521,23 @@ def perform_svm_grid_search(svm_data,
 #                                        0.1,
 #                                        CSS.peptide_one_hot_encoding)
 
-td = CSD.create_relative_ecfp_dictionary(calixarene_csv_folder='Featurization/',
-                                calixarene_csv_file='calix smiles absolute.csv',
-                                target_columns=['H3K4me1',
-                                                'H3K4me2',
-                                                'H3K4me3',
-                                                'H3R2me2s',
-                                                'H3R2me2a',
-                                                'H3K9me3',
-                                                'H3K4ac',
-                                                'H3K4'],
-                                target_columns_per_example='all')
+# td = CSD.create_relative_ecfp_dictionary(calixarene_csv_folder='Featurization/',
+#                                 calixarene_csv_file='calix smiles absolute.csv',
+#                                 target_columns=['H3K4me1',
+#                                                 'H3K4me2',
+#                                                 'H3K4me3',
+#                                                 'H3R2me2s',
+#                                                 'H3R2me2a',
+#                                                 'H3K9me3',
+#                                                 'H3K4ac',
+#                                                 'H3K4'],
+#                                 target_columns_per_example='all')
 
-cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
-                                                 split_method='by_host',
-                                                 train_fraction=0.8,
-                                                 test_fraction=0.1,
-                                                 num_folds=10)
+# cv_sd = CSD.cross_validation_split_calix_dataset(calixarene_dict=td,
+#                                                  split_method='by_host',
+#                                                  train_fraction=0.8,
+#                                                  test_fraction=0.1,
+#                                                  num_folds=10)
 
 # Usage:
 # for entry in range(10):

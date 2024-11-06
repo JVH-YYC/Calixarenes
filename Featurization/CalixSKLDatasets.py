@@ -12,11 +12,6 @@ from sklearn import svm
 from sklearn.ensemble import RandomForestRegressor as RFR 
 from Featurization import CalixSKLFeatures as CSF
 
-#Check which machine we are on
-if platform.system() == 'Darwin':
-    os.chdir('/Users/jeffreyvanhumbeck/Documents/GitHub/Calixarenes/')
-elif platform.system() == 'Linux':
-    os.chdir('/home/jvh/Documents/GitHub/Calixarenes/')
 
 def create_ecfp_dictionary(calixarene_csv_folder,
                            calixarene_csv_file,
@@ -61,6 +56,46 @@ def create_ecfp_dictionary(calixarene_csv_folder,
     
     return calixarene_dict
 
+def create_loo_ecfp_dictionary(calixarene_csv_folder,
+                               calixarene_csv_file,
+                               holdout_calixarene):
+    """
+    Essentially identical to the function above, but serves a singular purpose: making the final LOO dictionary
+    for final benchmarking. Only done in 'host' mode, and with each peptide predicted individually with one-hot encoding.
+
+    This function will *skip* the dataset splitting step, so test and train are created here.
+    """
+
+    # Read in the .csv file for calixarenes and one-hot encodings
+    calixarene_df = pd.read_csv(calixarene_csv_folder + calixarene_csv_file)
+
+    # Create a dictionary to hold the calixarene data
+    calixarene_dict = {}
+    calixarene_dict['train'] = {}
+    calixarene_dict['test'] = {}
+
+    # Always looking at all columns
+    target_columns = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+    # Iterate through the rows of the dataframe
+    for index, row in calixarene_df.iterrows():
+        #Check for duplicates and whether the host is the holdout
+        if row['Host'] != holdout_calixarene:
+            if row['Host'] not in calixarene_dict['train']:
+                for targ_no, specific_column in enumerate(target_columns):
+                    calixarene_dict['train'][row['Host'] + str('_') + str(targ_no)] = {'SMILES': row['SMILES'],
+                                                    'ECFP': CSF.create_ecfp6_fingerprint(row['SMILES']),
+                                                    'Target_Val': row[specific_column],
+                                                    'Target': specific_column}
+        else:
+            if row['Host'] not in calixarene_dict['test']:
+                for targ_no, specific_column in enumerate(target_columns):
+                    calixarene_dict['test'][row['Host'] + str('_') + str(targ_no)] = {'SMILES': row['SMILES'],
+                                                    'ECFP': CSF.create_ecfp6_fingerprint(row['SMILES']),
+                                                    'Target_Val': row[specific_column],
+                                                    'Target': specific_column}
+    
+    return calixarene_dict
+
 def create_relative_ecfp_dictionary(calixarene_csv_folder,
                                     calixarene_csv_file,
                                     target_columns,
@@ -82,15 +117,65 @@ def create_relative_ecfp_dictionary(calixarene_csv_folder,
         if target_columns_per_example == 'each':
             for target in target_columns:
                 key = host_pair + (target,)
-                calixarene_comparison_dict[host_pair] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+                calixarene_comparison_dict[key] = {'SMILES': (row1['SMILES'], row2['SMILES']),
                                                          'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES'])),
                                                          'Target_Val': row1[target] - row2[target],
                                                          'Target': target}
         elif target_columns_per_example == 'all':
             differences = tuple(row1[target] - row2[target] for target in target_columns)
-            calixarene_comparison_dict[host_pair] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+            calixarene_comparison_dict[key] = {'SMILES': (row1['SMILES'], row2['SMILES']),
                                                      'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES'])),
                                                      'Target_Val': differences}
+
+    return calixarene_comparison_dict
+
+def create_loo_relative_ecfp_dictionary(calixarene_csv_folder,
+                                        calixarene_csv_file,
+                                        holdout_calixarene,
+                                        method):
+    """
+    A nearly identical function to that above, but for the final LOO benchmarking,
+    so always in 'host' and 'each' mode.
+
+    As with the absolute LOO dictionary, there will be no splitting happening later on - so 'test' and 'train' are set up immediately.
+    """
+
+    # Read in the .csv file
+    calixarene_df = pd.read_csv(calixarene_csv_folder + calixarene_csv_file)
+
+    calixarene_comparison_dict = {}
+    calixarene_comparison_dict['train'] = {}
+    calixarene_comparison_dict['test'] = {}
+
+    # Always looking at all columns
+    target_columns = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+
+    # Iterate over all combinations of two different hosts
+    for (idx1, row1), (idx2, row2) in itertools.combinations(calixarene_df.iterrows(), 2):
+        host_pair = (row1['Host'], row2['Host'])
+        
+        if row1['Host'] != holdout_calixarene and row2['Host'] != holdout_calixarene:
+            for target in target_columns:
+                key = host_pair + (target,)
+                calixarene_comparison_dict['train'][key] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+                                                         'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES']),
+                                                                                                     method),
+                                                         'Target_Val': row1[target] - row2[target],
+                                                         'Target': target}
+        else:
+            for target in target_columns:
+                key = host_pair + (target,)
+                calixarene_comparison_dict['test'][key] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+                                                         'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES']),
+                                                                                                     method),
+                                                         'Target_Val': row1[target] - row2[target],
+                                                         'Target': target}
+                if row1['Host'] == holdout_calixarene:
+                    calixarene_comparison_dict['test'][key]['holdout_pos'] = 'row1'
+                    calixarene_comparison_dict['test'][key]['known_val'] = row2[target]
+                elif row2['Host'] == holdout_calixarene:
+                    calixarene_comparison_dict['test'][key]['holdout_pos'] = 'row2'
+                    calixarene_comparison_dict['test'][key]['known_val'] = row1[target]
 
     return calixarene_comparison_dict
 
@@ -316,4 +401,58 @@ def organize_random_forest_input(split_calix_dataset,
             calixarene_rf_dict[dataset_split]['target'] = np.array(full_sample_target_list)
             
     return calixarene_rf_dict
+
+def organize_loo_model_input(loo_calix_dataset,
+                             one_hot_encoding_folder,
+                             peptide_one_hot_encoding,
+                             relative_training):
+    """
+    A function derived from the one directly above, but with some features removed as it is only for final LOO testing.
+
+    Therefore, there is no 'validation' split, and the data is always split by 'host', and each point is treated individually.
+
+    Also, the only ordered feature for the final investigation is 'EFCP', so the ordered_feature_list is removed.
+    """
+    # Open one-hot encodings as dataframe
+    one_hot_df = pd.read_csv(one_hot_encoding_folder + peptide_one_hot_encoding, index_col='Peptide')
+
+    calixarene_model_dict = {}
+    calixarene_model_dict['train'] = {}
+    calixarene_model_dict['test'] = {}
+
+    type_list = ['train', 'test']
+    peptide_name_order = []
+
+    for dataset_split in type_list:
+        full_sample_list = []
+        full_sample_target_list = []
+        if relative_training and dataset_split == 'test':
+            known_calix_position = []
+            known_calix_value = []
+            full_peptide_list = []
+
+        for idx, example in enumerate(loo_calix_dataset[dataset_split]):
+            if idx < 8 and dataset_split == 'test':
+                #8 peptides in final LOO - record the first 8 in order
+                peptide_name_order.append(loo_calix_dataset[dataset_split][example]['Target'])
+            
+            feature_list = []
+            feature_list.append(loo_calix_dataset[dataset_split][example]['ECFP'])
+            feature_list.append(list(one_hot_df.loc[loo_calix_dataset[dataset_split][example]['Target']]))
+            
+            full_sample_list.append(np.concatenate(feature_list, axis=0))
+            full_sample_target_list.append(loo_calix_dataset[dataset_split][example]['Target_Val'])
+            if relative_training and dataset_split == 'test':
+                known_calix_position.append(loo_calix_dataset[dataset_split][example]['holdout_pos'])
+                known_calix_value.append(loo_calix_dataset[dataset_split][example]['known_val'])
+                full_peptide_list.append(loo_calix_dataset[dataset_split][example]['Target'])
+
+        calixarene_model_dict[dataset_split]['features'] = np.array(full_sample_list)
+        calixarene_model_dict[dataset_split]['target'] = np.array(full_sample_target_list)
+        if relative_training and dataset_split == 'test':
+            calixarene_model_dict[dataset_split]['known_pos'] = known_calix_position
+            calixarene_model_dict[dataset_split]['known_val'] = known_calix_value
+            calixarene_model_dict[dataset_split]['peptide_order'] = full_peptide_list
+
+    return calixarene_model_dict, peptide_name_order
 
