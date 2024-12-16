@@ -344,7 +344,6 @@ def loo_random_forest_final(calixarene_csv_folder,
                                 calixarene_list,
                                 output_name,
                                 relative_training,
-                                mode,
                                 method,
                                 n_estimators=100,
                                 max_depth=1,
@@ -365,7 +364,7 @@ def loo_random_forest_final(calixarene_csv_folder,
 
     # Initialize the dictionary to hold the results
     loo_results = {}
-
+    loo_int_results = {}
     # Loop through each calixarene
     for calix in calixarene_list:
         # Create the dataset
@@ -374,7 +373,49 @@ def loo_random_forest_final(calixarene_csv_folder,
                                                calixarene_csv_file=calixarene_csv_name,
                                                peptide_one_hot_encoding=peptide_one_hot_encoding,
                                                holdout_calixarene=calix,
-                                               mode=mode)
+                                               method=method)
+            # Initialize the Random Forest Regressor
+            rfr = RandomForestRegressor(n_estimators=n_estimators,
+                                        max_depth=max_depth,
+                                        min_samples_split=min_samples_split,
+                                        min_samples_leaf=min_samples_leaf,
+                                        bootstrap=bootstrap)
+
+            # Train on the 'train' split
+            rfr.fit(rfi['train']['features'], rfi['train']['target'])
+
+            # Evaluate on 'test' split. Must re-shape the features, as it's a single sample.
+            predictions = rfr.predict(rfi['test']['features'])
+            mse = mean_squared_error(rfi['test']['target'], predictions)
+
+            #Organize lists
+            actual_values = rfi['test']['target']
+            predicted_diffs = predictions
+            test_calix_positions = rfi['test']['test_pos']
+            peptide_names = rfi['test']['peptide_order']
+            known_calix_values = rfi['test']['known_val']
+
+            # Create lists for storing intermediate results
+            loo_int_results[calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
+            for actual, predicted_diff, position, peptide_name, known_calix in zip(
+                    actual_values, predicted_diffs, test_calix_positions, peptide_names, known_calix_values):
+                
+                # Calculate the predicted value for the unknown calix
+                if position == 'row1':
+                    predicted_value = predicted_diff + known_calix
+                    act_val = actual + known_calix  
+                else:
+                    predicted_value = -1 * (predicted_diff - known_calix)
+                    act_val = -1 * (actual - known_calix) 
+
+                # Append the actual and predicted values to the loo_int_results dictionary
+                loo_int_results[calix][peptide_name]['actual'].append(act_val)
+                loo_int_results[calix][peptide_name]['predicted'].append(predicted_value)
+
+            loo_results[calix] = {name: {'actual': np.mean(loo_int_results[calix][name]['actual']),
+                                               'predicted': np.mean(loo_int_results[calix][name]['predicted'])} for name in peptide_name_list}
+
+     
         else:
             rfi, peptide_name_list = create_LOO_absolute_datasets(calixarene_csv_folder=calixarene_csv_folder,
                                                                   calixarene_csv_file=calixarene_csv_name,
