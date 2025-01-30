@@ -1,7 +1,7 @@
 """
 Visualization scripts for calixarene project.
 
-All data is held in dictionaries with the following structure: {'host': {'peptide 1': (result),
+All LOO data is held in dictionaries with the following structure: {'host': {'peptide 1': (result),
 'peptide 2': (result), ...}, 'host 2': {'peptide 1': (result), 'peptide 2': (result), ...}, ...}
 
 Functions for creating AUROC plots, violin plots, predicted vs. actual scatters, as well as
@@ -11,6 +11,10 @@ There is also the issue of 'accurate' vs. 'useful'. If a prediction has the corr
 adsorption predictions, but is off by a systematic error, this would be represented by a
 slope close to 1, but an intercept far from 0. The is 'useful', but not 'accurate' (accurate will
 have both slope and interecept within a certain range)
+
+For a final test (after LOO was completed), different amouts of test data were held out. These dictionaries are of different structure.
+The top-level key is simply the repeat round (from 0-19 for 20 repeats). Within these, each host points to a list of tuples, where the
+tuples are (predicted, actual) values. From these, one can calculate the same metrics as above.
 """
 
 import matplotlib.pyplot as plt
@@ -259,6 +263,43 @@ def calculate_and_save_all_metrics(organized_dict,
         save_metrics_to_file(metrics_dict, output_name)
     
     return
+
+def calculate_bothr2_by_holdout(result_folder,
+                                dict_of_holdout_amounts):
+    """
+    A function that takes the results of several different levels of test split, and calculates both the
+    absolute and relative r2 values for each.
+
+    It also enumerates what fraction of the total absolute predictions are above 0.6r2, and if not above 0.6r2,
+    whether the relative is above 0.6adjr2
+    """
+
+    # Load the results from the files
+    results_dict = {}
+    for holdout_amt in dict_of_holdout_amounts:
+        all_r2 = []
+        all_adj_r2 = []
+        results_dict[holdout_amt] = {}
+        curr_dict = load_result_dict(result_folder,
+                                        dict_of_holdout_amounts[holdout_amt])
+        for repeat_trial in curr_dict:
+            for curr_calix in curr_dict[repeat_trial]:
+                if curr_calix[0] in ['A', 'E', 'P']:
+                    curr_results = curr_dict[repeat_trial][curr_calix]
+                    curr_predict = [x[0] for x in curr_results]
+                    curr_actual = [x[1] for x in curr_results]
+                    mse, r2, adjusted_r2, shift_amount = calculate_metrics(curr_predict, curr_actual)
+                    all_r2.append(r2)
+                    all_adj_r2.append(adjusted_r2)
+        
+        abs_r2_success = sum([1 for x in all_r2 if x > 0.6]) / len(all_r2)
+        adj_r2_success = sum([1 for x, y in zip(all_r2, all_adj_r2) if x <= 0.6 and y > 0.6]) / len(all_r2)
+        results_dict[holdout_amt]['r2_median'] = statistics.median(all_r2)
+        results_dict[holdout_amt]['r2_success'] = abs_r2_success
+        results_dict[holdout_amt]['adj_r2_median'] = statistics.median(all_adj_r2)
+        results_dict[holdout_amt]['adj_r2_success'] = adj_r2_success
+        results_dict[holdout_amt]['summed_success'] = abs_r2_success + adj_r2_success
+    return results_dict
 
 def multi_scatter_plot(pickle_file_folder,
                     list_of_pickle_files,

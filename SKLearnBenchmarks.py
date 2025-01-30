@@ -50,6 +50,42 @@ def create_single_split_ECFP_dataset(calixarene_csv_folder,
     
     return random_forest_input
 
+def create_structured_ECFP_dataset(calixarene_csv_folder,
+                                   calixarene_csv_file,
+                                   peptide_one_hot_encoding,
+                                   split_calixarene_dict,
+                                   holdout_size,
+                                   relative_training):
+    """
+    A function for final testing; to see how much the size of the test holdout influences performance,
+    with both absolute and relative training approaches.
+
+    LOO model input organization function will still work fine for this dataset split
+    """
+
+    if relative_training == True:
+        first_calix_dict = CSD.create_structured_relative_ecfp_dictionary(calixarene_csv_folder=calixarene_csv_folder,
+                                                                          calixarene_csv_file=calixarene_csv_file,
+                                                                          split_calixarene_dict=split_calixarene_dict,
+                                                                          holdout_size=holdout_size)
+        model_input, peptide_name_list = CSD.organize_structured_model_input(structured_calix_dataset=first_calix_dict,
+                                                                      one_hot_encoding_folder=calixarene_csv_folder,
+                                                                      peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                      relative_training=True)
+        
+    else:
+        first_calix_dict = CSD.create_structured_absolute_ecfp_dictionary(calixarene_csv_folder=calixarene_csv_folder,
+                                                                          calixarene_csv_file=calixarene_csv_file,
+                                                                          split_calixarene_dict=split_calixarene_dict,
+                                                                          holdout_size=holdout_size)
+        
+        model_input, peptide_name_list = CSD.organize_structured_model_input(structured_calix_dataset=first_calix_dict,
+                                                                      one_hot_encoding_folder=calixarene_csv_folder,
+                                                                      peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                      relative_training=False)
+    
+    return model_input, peptide_name_list
+
 def create_LOO_absolute_datasets(calixarene_csv_folder,
                                  calixarene_csv_file,
                                  peptide_one_hot_encoding,
@@ -67,7 +103,7 @@ def create_LOO_absolute_datasets(calixarene_csv_folder,
     absolute_model_input, peptide_name_list = CSD.organize_loo_model_input(loo_calix_dataset=first_calix_dict,
                                                        one_hot_encoding_folder=calixarene_csv_folder,
                                                        peptide_one_hot_encoding=peptide_one_hot_encoding,
-                                                       mode='absolute')
+                                                       relative_training=False)
     
     return absolute_model_input, peptide_name_list
 
@@ -538,16 +574,132 @@ def loo_svm_final(calixarene_csv_folder,
         pickle.dump(loo_results, f)
 
     return loo_results
-                                
 
-calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
-                   'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
-                   'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
-                   'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
-                   'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
-                   'CP2', 'DP2', 'DM1', 'DO2', 'DO2', 'DO3',
-                   'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
-                   'P-NO2', 'PSC4']
+def svm_structured_final(calixarene_csv_folder,
+                         calixarene_csv_file,
+                         peptide_one_hot_encoding,
+                         holdout_size,
+                         num_trials,
+                         relative_training,
+                         split_calixarene_dict,
+                         output_name,
+                         C=100,
+                         kernel='rbf',
+                         gamma='scale',
+                         epsilon=0.1):
+    """
+    A function set up to test holding out different amounts of training data from SVM model.
+
+    This is the last thing done - some hyperparameter optimization, 'concat' vs 'diff' method, etc. have all been established
+
+    """                                
+
+    # Initialize the dictionary to hold the results
+    split_int_results = {}
+    split_results = {}
+
+    # Open copy of one_hot_encoding, to concatenate test items at prediction time
+    
+    # Loop through each calixarene
+    for repeat in range(num_trials):
+        # Create the dataset
+        if relative_training:
+            svi, peptide_name_list = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
+                                                                    calixarene_csv_file=calixarene_csv_file,
+                                                                    peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                    split_calixarene_dict=split_calixarene_dict,
+                                                                    holdout_size=holdout_size,
+                                                                    relative_training=True)
+            
+            # Initialize the Support Vector Regressor
+            svm = SVR(C=C,
+                    kernel=kernel,
+                    gamma=gamma,
+                    epsilon=epsilon)
+
+            # Train on the 'train' split
+            svm.fit(svi['train']['features'], svi['train']['target'])
+
+            # Evaluate on 'test' split. Must re-shape the features, as it's a single sample.
+            predictions = svm.predict(svi['test']['features'])
+            mse = mean_squared_error(svi['test']['target'], predictions)
+
+            #Organize lists
+            actual_values = svi['test']['target']
+            predicted_diffs = predictions
+            test_calix_positions = svi['test']['test_pos']
+            peptide_names = svi['test']['peptide_order']
+            known_calix_values = svi['test']['known_val']
+
+            # Create lists for storing intermediate results
+            split_int_results[calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
+            for actual, predicted_diff, position, peptide_name, known_calix in zip(
+                    actual_values, predicted_diffs, test_calix_positions, peptide_names, known_calix_values):
+                
+                # Calculate the predicted value for the unknown calix
+                if position == 'row1':
+                    predicted_value = predicted_diff + known_calix
+                    act_val = actual + known_calix  
+                else:
+                    predicted_value = -1 * (predicted_diff - known_calix)
+                    act_val = -1 * (actual - known_calix) 
+
+                # Append the actual and predicted values to the loo_int_results dictionary
+                split_int_results[calix][peptide_name]['actual'].append(act_val)
+                split_int_results[calix][peptide_name]['predicted'].append(predicted_value)
+
+            split_results[calix] = {name: {'actual': np.mean(split_int_results[calix][name]['actual']),
+                                               'predicted': np.mean(split_int_results[calix][name]['predicted'])} for name in peptide_name_list}
+
+        else:
+            svi, peptide_name_list = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
+                                                                    calixarene_csv_file=calixarene_csv_file,
+                                                                    peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                    split_calixarene_dict=split_calixarene_dict,
+                                                                    holdout_size=holdout_size,
+                                                                    relative_training=False)
+
+            # Initialize the Support Vector Regressor
+            svm = SVR(C=C,
+                    kernel=kernel,
+                    gamma=gamma,
+                    epsilon=epsilon)
+
+            # Train on the 'train' split
+            svm.fit(svi['train']['features'], svi['train']['target'])
+
+            split_results[str(repeat)] = {}
+            for entry in svi['test']:
+                if entry.split('_')[0] not in split_results[str(repeat)]:
+                    split_results[str(repeat)][entry.split('_')[0]] = []
+                test_entry = np.concatenate((svi['test'][entry]['ECFP'], svi['test'][entry]['Peptide_OH']), axis=0)
+                curr_pred = svm.predict(test_entry.reshape(1, -1))
+                split_results[str(repeat)][entry.split('_')[0]].append((curr_pred[0], svi['test'][entry]['Target_Val']))
+
+    # Save the dictionary to a pickle file
+    with open(output_name, 'wb') as f:
+        pickle.dump(split_results, f)
+
+    return split_results
+
+
+split_calix_dict = {'predictable': ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
+                                    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+                                    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+                                    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+                                    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+                                    'P-NO2', 'PSC4'],
+                    'unpredictable': ['BP0', 'BP1', 'BH2', 'BM1', 'CP1',
+                                      'CP2', 'DP2', 'DM1', 'DO2', 'DO3']}
+
+# calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
+#                    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+#                    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+#                    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+#                    'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
+#                    'CP2', 'DP2', 'DM1', 'DO2', 'DO2', 'DO3',
+#                    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+#                    'P-NO2', 'PSC4']
 
 # rfi = create_single_split_ECFP_dataset('Featurization/',
 #                                        'calix smiles absolute.csv',
