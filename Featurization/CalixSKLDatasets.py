@@ -112,6 +112,9 @@ def create_structured_relative_ecfp_dictionary(calixarene_csv_folder,
     A complementary function to that directly above, just for relative training/prediction rather than absolute
 
     Only method being used for fingerprints is 'concat', based on previous testing
+
+    To this dict, add 'test calix' as a key, with the list of selected calixarenes for testing. Unlike in absolute training,
+    it's not immediately obvious which calix is being tested.
     """
 
     # Read in the .csv file
@@ -131,6 +134,7 @@ def create_structured_relative_ecfp_dictionary(calixarene_csv_folder,
     holdout_calixarenes_pred = random.sample(split_calixarene_dict['predictable'], holdout_pred_amount)
     holdout_calixarenes_unpred = random.sample(split_calixarene_dict['unpredictable'], holdout_unpred_amount)
     all_holdout_calix = holdout_calixarenes_pred + holdout_calixarenes_unpred
+    calixarene_comparison_dict['holdout'] = all_holdout_calix
 
     # Iterate over all combinations of two different hosts
     for (idx1, row1), (idx2, row2) in itertools.permutations(calixarene_df.iterrows(), 2):
@@ -190,7 +194,6 @@ def create_structured_absolute_ecfp_dictionary(calixarene_csv_folder,
     holdout_calixarenes_pred = random.sample(split_calixarene_dict['predictable'], holdout_pred_amount)
     holdout_calixarenes_unpred = random.sample(split_calixarene_dict['unpredictable'], holdout_unpred_amount)
     all_holdout_calix = holdout_calixarenes_pred + holdout_calixarenes_unpred
-    calixarene_dict['holdout'] = all_holdout_calix
     # Iterate through the rows of the dataframe
     for index, row in calixarene_df.iterrows():
         #Check for duplicates and whether the host is the holdout
@@ -611,10 +614,9 @@ def organize_loo_model_input(loo_calix_dataset,
 
     return calixarene_model_dict, peptide_name_order
 
-def organize_structured_model_input(structured_calix_dataset,
+def organize_structured_absolute_model_input(structured_calix_dataset,
                                     one_hot_encoding_folder,
-                                    peptide_one_hot_encoding,
-                                    relative_training):
+                                    peptide_one_hot_encoding):
     """
     A complementary function to that above - with the main difference being that this example
     will have multiple calixarenes held out. Doesn't matter for training set - but test set must
@@ -629,17 +631,11 @@ def organize_structured_model_input(structured_calix_dataset,
 
     calixarene_model_dict = {}
     calixarene_model_dict['train'] = {}
-    # calixarene_model_dict['test'] = structured_calix_dataset['test']
     calixarene_model_dict['test'] = {}
-    peptide_name_order = []
 
     #Only process into training set
     full_sample_list = []
     full_sample_target_list = []
-    # if relative_training and dataset_split == 'test':
-    #     test_calix_position = []
-    #     known_calix_value = []
-    #     full_peptide_list = []
 
     for idx, example in enumerate(structured_calix_dataset['train']):
         feature_list = []
@@ -658,4 +654,41 @@ def organize_structured_model_input(structured_calix_dataset,
         calixarene_model_dict['test'][example]['Target_Val'] = structured_calix_dataset['test'][example]['Target_Val']
         calixarene_model_dict['test'][example]['Peptide_OH'] = np.array(list(one_hot_df.loc[structured_calix_dataset['test'][example]['Target']]))
         
-    return calixarene_model_dict, peptide_name_order
+    return calixarene_model_dict
+
+def organize_structured_relative_model_input(structured_calix_dataset,
+                                              one_hot_encoding_folder,
+                                              peptide_one_hot_encoding):
+    """
+    A complementary function to that above, but for relative training. When relative training,
+    the dictionary contains a list of test calixarenes to aid in assembling the test results
+    """
+
+    # Open one-hot encodings as dataframe
+    one_hot_df = pd.read_csv(one_hot_encoding_folder + peptide_one_hot_encoding, index_col='Peptide')
+
+    calixarene_model_dict = {}
+    calixarene_model_dict['train'] = {}
+    calixarene_model_dict['test'] = {}
+    calixarene_model_dict['holdout'] = structured_calix_dataset['holdout']
+    
+    #Only process into training set
+    full_sample_list = []
+    full_sample_target_list = []
+
+    for idx, example in enumerate(structured_calix_dataset['train']):
+        feature_list = []
+        feature_list.append(structured_calix_dataset['train'][example]['ECFP'])
+        feature_list.append(list(one_hot_df.loc[structured_calix_dataset['train'][example]['Target']]))
+        
+        full_sample_list.append(np.concatenate(feature_list, axis=0))
+        full_sample_target_list.append(structured_calix_dataset['train'][example]['Target_Val'])
+
+        calixarene_model_dict['train']['features'] = np.array(full_sample_list)
+        calixarene_model_dict['train']['target'] = np.array(full_sample_target_list)
+    
+    for idx, example in enumerate(structured_calix_dataset['test']):
+        calixarene_model_dict['test'][example] = structured_calix_dataset['test'][example]
+        calixarene_model_dict['test'][example]['Peptide_OH'] = np.array(list(one_hot_df.loc[structured_calix_dataset['test'][example]['Target']]))
+        
+    return calixarene_model_dict

@@ -68,10 +68,9 @@ def create_structured_ECFP_dataset(calixarene_csv_folder,
                                                                           calixarene_csv_file=calixarene_csv_file,
                                                                           split_calixarene_dict=split_calixarene_dict,
                                                                           holdout_size=holdout_size)
-        model_input, peptide_name_list = CSD.organize_structured_model_input(structured_calix_dataset=first_calix_dict,
+        model_input = CSD.organize_structured_relative_model_input(structured_calix_dataset=first_calix_dict,
                                                                       one_hot_encoding_folder=calixarene_csv_folder,
-                                                                      peptide_one_hot_encoding=peptide_one_hot_encoding,
-                                                                      relative_training=True)
+                                                                      peptide_one_hot_encoding=peptide_one_hot_encoding)
         
     else:
         first_calix_dict = CSD.create_structured_absolute_ecfp_dictionary(calixarene_csv_folder=calixarene_csv_folder,
@@ -79,12 +78,11 @@ def create_structured_ECFP_dataset(calixarene_csv_folder,
                                                                           split_calixarene_dict=split_calixarene_dict,
                                                                           holdout_size=holdout_size)
         
-        model_input, peptide_name_list = CSD.organize_structured_model_input(structured_calix_dataset=first_calix_dict,
+        model_input = CSD.organize_structured_absolute_model_input(structured_calix_dataset=first_calix_dict,
                                                                       one_hot_encoding_folder=calixarene_csv_folder,
-                                                                      peptide_one_hot_encoding=peptide_one_hot_encoding,
-                                                                      relative_training=False)
+                                                                      peptide_one_hot_encoding=peptide_one_hot_encoding)
     
-    return model_input, peptide_name_list
+    return model_input
 
 def create_LOO_absolute_datasets(calixarene_csv_folder,
                                  calixarene_csv_file,
@@ -600,7 +598,7 @@ def svm_structured_final(calixarene_csv_folder,
 
     # Open copy of one_hot_encoding, to concatenate test items at prediction time
     
-    # Loop through each calixarene
+    # Loop through each repeat trial
     for repeat in range(num_trials):
         # Create the dataset
         if relative_training:
