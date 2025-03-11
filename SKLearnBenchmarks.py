@@ -680,6 +680,115 @@ def svm_structured_final(calixarene_csv_folder,
 
     return split_results
 
+def rf_structured_final(calixarene_csv_folder,
+                        calixarene_csv_file,
+                        peptide_one_hot_encoding,
+                        holdout_size,
+                        num_trials,
+                        relative_training,
+                        split_calixarene_dict,
+                        output_name,
+                        n_estimators=100,
+                        max_depth=1,
+                        min_samples_split=2,
+                        min_samples_leaf=4,
+                        bootstrap=True):
+    """
+    A function set up to test holding out different amounts of training data from SVM model.
+
+    This is the last thing done - some hyperparameter optimization, 'concat' vs 'diff' method, etc. have all been established
+
+    """                                
+
+    # Initialize the dictionary to hold the results
+    split_int_results = {}
+    split_results = {}
+
+    # Open copy of one_hot_encoding, to concatenate test items at prediction time
+    
+    # Loop through each repeat trial
+    for repeat in range(num_trials):
+        # Create the dataset
+        if relative_training:
+            svi, peptide_name_list = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
+                                                                    calixarene_csv_file=calixarene_csv_file,
+                                                                    peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                    split_calixarene_dict=split_calixarene_dict,
+                                                                    holdout_size=holdout_size,
+                                                                    relative_training=True)
+            
+            # Initialize the Support Vector Regressor
+            rfr = RandomForestRegressor(n_estimators=n_estimators,
+                                        max_depth=max_depth,
+                                        min_samples_split=min_samples_split,
+                                        min_samples_leaf=min_samples_leaf,
+                                        bootstrap=bootstrap)
+
+            # Train on the 'train' split
+            rfr.fit(svi['train']['features'], svi['train']['target'])
+
+            # Evaluate on 'test' split. Must re-shape the features, as it's a single sample.
+            predictions = rfr.predict(svi['test']['features'])
+            mse = mean_squared_error(svi['test']['target'], predictions)
+
+            #Organize lists
+            actual_values = svi['test']['target']
+            predicted_diffs = predictions
+            test_calix_positions = svi['test']['test_pos']
+            peptide_names = svi['test']['peptide_order']
+            known_calix_values = svi['test']['known_val']
+
+            # Create lists for storing intermediate results
+            split_int_results[calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
+            for actual, predicted_diff, position, peptide_name, known_calix in zip(
+                    actual_values, predicted_diffs, test_calix_positions, peptide_names, known_calix_values):
+                
+                # Calculate the predicted value for the unknown calix
+                if position == 'row1':
+                    predicted_value = predicted_diff + known_calix
+                    act_val = actual + known_calix  
+                else:
+                    predicted_value = -1 * (predicted_diff - known_calix)
+                    act_val = -1 * (actual - known_calix) 
+
+                # Append the actual and predicted values to the loo_int_results dictionary
+                split_int_results[calix][peptide_name]['actual'].append(act_val)
+                split_int_results[calix][peptide_name]['predicted'].append(predicted_value)
+
+            split_results[calix] = {name: {'actual': np.mean(split_int_results[calix][name]['actual']),
+                                               'predicted': np.mean(split_int_results[calix][name]['predicted'])} for name in peptide_name_list}
+
+        else:
+            svi, peptide_name_list = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
+                                                                    calixarene_csv_file=calixarene_csv_file,
+                                                                    peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                                    split_calixarene_dict=split_calixarene_dict,
+                                                                    holdout_size=holdout_size,
+                                                                    relative_training=False)
+
+            # Initialize the Support Vector Regressor
+            rfr = RandomForestRegressor(n_estimators=n_estimators,
+                                        max_depth=max_depth,
+                                        min_samples_split=min_samples_split,
+                                        min_samples_leaf=min_samples_leaf,
+                                        bootstrap=bootstrap)
+
+            # Train on the 'train' split
+            rfr.fit(svi['train']['features'], svi['train']['target'])
+
+            split_results[str(repeat)] = {}
+            for entry in svi['test']:
+                if entry.split('_')[0] not in split_results[str(repeat)]:
+                    split_results[str(repeat)][entry.split('_')[0]] = []
+                test_entry = np.concatenate((svi['test'][entry]['ECFP'], svi['test'][entry]['Peptide_OH']), axis=0)
+                curr_pred = rfr.predict(test_entry.reshape(1, -1))
+                split_results[str(repeat)][entry.split('_')[0]].append((curr_pred[0], svi['test'][entry]['Target_Val']))
+
+    # Save the dictionary to a pickle file
+    with open(output_name, 'wb') as f:
+        pickle.dump(split_results, f)
+
+    return split_results
 
 split_calix_dict = {'predictable': ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
                                     'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
