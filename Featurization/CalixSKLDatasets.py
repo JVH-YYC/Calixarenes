@@ -56,6 +56,164 @@ def create_ecfp_dictionary(calixarene_csv_folder,
     
     return calixarene_dict
 
+def create_structured_ecfp_dictionary(calixarene_csv_folder,
+                                      calixarene_csv_file,
+                                      split_calixarene_dict,
+                                      holdout_size):
+    """
+    A function used to test different sizes of data holdout - will there be a difference between
+    absolute training and relative training?
+
+    For the input calixarene lists, they are pre-segregated into the types of calixarenes that have been observed
+    to be 'predictable' (mono and unsubstituted) and 'unpredictable' (multiple substituents)
+
+    We only care about predictions for 'predictable' systems, so we exclude the 'unpredictable' systems from the test set.
+    """
+
+    # Read in the .csv file
+    calixarene_df = pd.read_csv(calixarene_csv_folder + calixarene_csv_file)
+
+    # Create a dictionary to hold the calixarene data
+    calixarene_dict = {}
+    calixarene_dict['train'] = {}
+    calixarene_dict['test'] = {}
+
+    # Determine the holdout calixarenes
+    holdout_calixarenes_pred = random.sample(list(split_calixarene_dict['predictable']), holdout_size)
+    holdout_calixarenes_unpred = random.sample(list(split_calixarene_dict['unpredictable']), holdout_size)
+
+    # Always looking at all columns
+    target_columns = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+    # Iterate through the rows of the dataframe
+    for index, row in calixarene_df.iterrows():
+        #Check for duplicates and whether the host is the holdout
+        if row['Host'] not in holdout_calixarenes_pred and row['Host'] not in holdout_calixarenes_unpred:
+            if row['Host'] not in calixarene_dict['train']:
+                for targ_no, specific_column in enumerate(target_columns):
+                    calixarene_dict['train'][row['Host'] + str('_') + str(targ_no)] = {'SMILES': row['SMILES'],
+                                                    'ECFP': CSF.create_ecfp6_fingerprint(row['SMILES']),
+                                                    'Target_Val': row[specific_column],
+                                                    'Target': specific_column}
+        else:
+            if row['Host'] not in calixarene_dict['test'] and row['Host'] in holdout_calixarenes_pred:
+                for targ_no, specific_column in enumerate(target_columns):
+                    calixarene_dict['test'][row['Host'] + str('_') + str(targ_no)] = {'SMILES': row['SMILES'],
+                                                    'ECFP': CSF.create_ecfp6_fingerprint(row['SMILES']),
+                                                    'Target_Val': row[specific_column],
+                                                    'Target': specific_column}
+    
+    return calixarene_dict
+
+def create_structured_relative_ecfp_dictionary(calixarene_csv_folder,
+                                               calixarene_csv_file,
+                                               split_calixarene_dict,
+                                               holdout_size):
+    """
+    A complementary function to that directly above, just for relative training/prediction rather than absolute
+
+    Only method being used for fingerprints is 'concat', based on previous testing
+
+    To this dict, add 'test calix' as a key, with the list of selected calixarenes for testing. Unlike in absolute training,
+    it's not immediately obvious which calix is being tested.
+    """
+
+    # Read in the .csv file
+    calixarene_df = pd.read_csv(calixarene_csv_folder + calixarene_csv_file)
+
+    calixarene_comparison_dict = {}
+    calixarene_comparison_dict['train'] = {}
+    calixarene_comparison_dict['test'] = {}
+
+    # Always looking at all columns
+    target_columns = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+
+    # Determine the holdout calixarenes - int() always rounds down
+    holdout_pred_amount = int(len(split_calixarene_dict['predictable']) * holdout_size)
+    holdout_unpred_amount = int(len(split_calixarene_dict['unpredictable']) * holdout_size)
+
+    holdout_calixarenes_pred = random.sample(split_calixarene_dict['predictable'], holdout_pred_amount)
+    holdout_calixarenes_unpred = random.sample(split_calixarene_dict['unpredictable'], holdout_unpred_amount)
+    all_holdout_calix = holdout_calixarenes_pred + holdout_calixarenes_unpred
+    calixarene_comparison_dict['holdout'] = all_holdout_calix
+
+    # Iterate over all combinations of two different hosts
+    for (idx1, row1), (idx2, row2) in itertools.permutations(calixarene_df.iterrows(), 2):
+        host_pair = (row1['Host'], row2['Host'])
+        
+        if row1['Host'] not in all_holdout_calix and row2['Host'] not in all_holdout_calix:
+            for target in target_columns:
+                key = host_pair + (target,)
+                calixarene_comparison_dict['train'][key] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+                                                         'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES']),
+                                                                                                     method='concat'),
+                                                         'Target_Val': row1[target] - row2[target],
+                                                         'Target': target}
+        else:
+            if (row1['Host'] in holdout_calixarenes_pred) ^ (row2['Host'] in holdout_calixarenes_pred):
+                if row1['Host'] not in holdout_calixarenes_unpred and row2['Host'] not in holdout_calixarenes_unpred:
+                    for target in target_columns:
+                        key = host_pair + (target,)
+                        calixarene_comparison_dict['test'][key] = {'SMILES': (row1['SMILES'], row2['SMILES']),
+                                                                'ECFP': CSF.create_double_ecpf6_fingerprint((row1['SMILES'], row2['SMILES']),
+                                                                                                            method='concat'),
+                                                                'Target_Val': row1[target] - row2[target],
+                                                                'Target': target}
+                        if row1['Host'] in holdout_calixarenes_pred:
+                            calixarene_comparison_dict['test'][key]['test_pos'] = 'row1'
+                            calixarene_comparison_dict['test'][key]['known_val'] = row2[target]
+                        elif row2['Host'] in holdout_calixarenes_pred:
+                            calixarene_comparison_dict['test'][key]['test_pos'] = 'row2'
+                            calixarene_comparison_dict['test'][key]['known_val'] = row1[target]
+
+    return calixarene_comparison_dict
+
+def create_structured_absolute_ecfp_dictionary(calixarene_csv_folder,
+                                               calixarene_csv_file,
+                                               split_calixarene_dict,
+                                               holdout_size):
+    """
+    A complementary function to that above, but for absolute training/prediction rather than relative
+
+    Add held-out calixarene names to the dictionary for later use
+    """
+
+    # Read in the .csv file
+    calixarene_df = pd.read_csv(calixarene_csv_folder + calixarene_csv_file)
+
+    calixarene_dict = {}
+    calixarene_dict['train'] = {}
+    calixarene_dict['test'] = {}
+
+    # Always looking at all columns
+    target_columns = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+
+    # Determine the holdout calixarenes - int() always rounds down
+    holdout_pred_amount = int(len(split_calixarene_dict['predictable']) * holdout_size)
+    holdout_unpred_amount = int(len(split_calixarene_dict['unpredictable']) * holdout_size)
+
+    holdout_calixarenes_pred = random.sample(split_calixarene_dict['predictable'], holdout_pred_amount)
+    holdout_calixarenes_unpred = random.sample(split_calixarene_dict['unpredictable'], holdout_unpred_amount)
+    all_holdout_calix = holdout_calixarenes_pred + holdout_calixarenes_unpred
+    # Iterate through the rows of the dataframe
+    for index, row in calixarene_df.iterrows():
+        #Check for duplicates and whether the host is the holdout
+        if row['Host'] not in all_holdout_calix:
+            if row['Host'] not in calixarene_dict['train']:
+                for targ_no, specific_column in enumerate(target_columns):
+                    calixarene_dict['train'][row['Host'] + str('_') + str(targ_no)] = {'SMILES': row['SMILES'],
+                                                    'ECFP': CSF.create_ecfp6_fingerprint(row['SMILES']),
+                                                    'Target_Val': row[specific_column],
+                                                    'Target': specific_column}
+        else:
+            if row['Host'] not in calixarene_dict['test']:
+                for targ_no, specific_column in enumerate(target_columns):
+                    calixarene_dict['test'][row['Host'] + str('_') + str(targ_no)] = {'SMILES': row['SMILES'],
+                                                    'ECFP': CSF.create_ecfp6_fingerprint(row['SMILES']),
+                                                    'Target_Val': row[specific_column],
+                                                    'Target': specific_column}
+    
+    return calixarene_dict
+    
 def create_loo_ecfp_dictionary(calixarene_csv_folder,
                                calixarene_csv_file,
                                holdout_calixarene):
@@ -456,3 +614,81 @@ def organize_loo_model_input(loo_calix_dataset,
 
     return calixarene_model_dict, peptide_name_order
 
+def organize_structured_absolute_model_input(structured_calix_dataset,
+                                    one_hot_encoding_folder,
+                                    peptide_one_hot_encoding):
+    """
+    A complementary function to that above - with the main difference being that this example
+    will have multiple calixarenes held out. Doesn't matter for training set - but test set must
+    be organized in such a way that absolute R2 and adjusted R2 can be calculated.
+
+    While not computationally efficient, directly porting the test set from the structured_calix_dataset
+    would keep a useful structure
+    """
+
+    # Open one-hot encodings as dataframe
+    one_hot_df = pd.read_csv(one_hot_encoding_folder + peptide_one_hot_encoding, index_col='Peptide')
+
+    calixarene_model_dict = {}
+    calixarene_model_dict['train'] = {}
+    calixarene_model_dict['test'] = {}
+
+    #Only process into training set
+    full_sample_list = []
+    full_sample_target_list = []
+
+    for idx, example in enumerate(structured_calix_dataset['train']):
+        feature_list = []
+        feature_list.append(structured_calix_dataset['train'][example]['ECFP'])
+        feature_list.append(list(one_hot_df.loc[structured_calix_dataset['train'][example]['Target']]))
+        
+        full_sample_list.append(np.concatenate(feature_list, axis=0))
+        full_sample_target_list.append(structured_calix_dataset['train'][example]['Target_Val'])
+
+        calixarene_model_dict['train']['features'] = np.array(full_sample_list)
+        calixarene_model_dict['train']['target'] = np.array(full_sample_target_list)
+    
+    for idx, example in enumerate(structured_calix_dataset['test']):
+        calixarene_model_dict['test'][example] = {}
+        calixarene_model_dict['test'][example]['ECFP'] = structured_calix_dataset['test'][example]['ECFP']
+        calixarene_model_dict['test'][example]['Target_Val'] = structured_calix_dataset['test'][example]['Target_Val']
+        calixarene_model_dict['test'][example]['Peptide_OH'] = np.array(list(one_hot_df.loc[structured_calix_dataset['test'][example]['Target']]))
+        
+    return calixarene_model_dict
+
+def organize_structured_relative_model_input(structured_calix_dataset,
+                                              one_hot_encoding_folder,
+                                              peptide_one_hot_encoding):
+    """
+    A complementary function to that above, but for relative training. When relative training,
+    the dictionary contains a list of test calixarenes to aid in assembling the test results
+    """
+
+    # Open one-hot encodings as dataframe
+    one_hot_df = pd.read_csv(one_hot_encoding_folder + peptide_one_hot_encoding, index_col='Peptide')
+
+    calixarene_model_dict = {}
+    calixarene_model_dict['train'] = {}
+    calixarene_model_dict['test'] = {}
+    calixarene_model_dict['holdout'] = structured_calix_dataset['holdout']
+    
+    #Only process into training set
+    full_sample_list = []
+    full_sample_target_list = []
+
+    for idx, example in enumerate(structured_calix_dataset['train']):
+        feature_list = []
+        feature_list.append(structured_calix_dataset['train'][example]['ECFP'])
+        feature_list.append(list(one_hot_df.loc[structured_calix_dataset['train'][example]['Target']]))
+        
+        full_sample_list.append(np.concatenate(feature_list, axis=0))
+        full_sample_target_list.append(structured_calix_dataset['train'][example]['Target_Val'])
+
+        calixarene_model_dict['train']['features'] = np.array(full_sample_list)
+        calixarene_model_dict['train']['target'] = np.array(full_sample_target_list)
+    
+    for idx, example in enumerate(structured_calix_dataset['test']):
+        calixarene_model_dict['test'][example] = structured_calix_dataset['test'][example]
+        calixarene_model_dict['test'][example]['Peptide_OH'] = np.array(list(one_hot_df.loc[structured_calix_dataset['test'][example]['Target']]))
+        
+    return calixarene_model_dict
