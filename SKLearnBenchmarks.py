@@ -380,7 +380,7 @@ def loo_random_forest_final(calixarene_csv_folder,
                                 relative_training,
                                 method,
                                 n_estimators=100,
-                                max_depth=1,
+                                max_depth=10,
                                 min_samples_split=2,
                                 min_samples_leaf=4,
                                 bootstrap=True):
@@ -689,7 +689,7 @@ def rf_structured_final(calixarene_csv_folder,
                         split_calixarene_dict,
                         output_name,
                         n_estimators=100,
-                        max_depth=1,
+                        max_depth=10,
                         min_samples_split=2,
                         min_samples_leaf=4,
                         bootstrap=True):
@@ -701,21 +701,24 @@ def rf_structured_final(calixarene_csv_folder,
     """                                
 
     # Initialize the dictionary to hold the results
-    split_int_results = {}
     split_results = {}
 
-    # Open copy of one_hot_encoding, to concatenate test items at prediction time
-    
+    # For this function, always evaluate every peptide
+    peptide_name_list = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+
     # Loop through each repeat trial
     for repeat in range(num_trials):
         # Create the dataset
         if relative_training:
-            svi, peptide_name_list = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
-                                                                    calixarene_csv_file=calixarene_csv_file,
-                                                                    peptide_one_hot_encoding=peptide_one_hot_encoding,
-                                                                    split_calixarene_dict=split_calixarene_dict,
-                                                                    holdout_size=holdout_size,
-                                                                    relative_training=True)
+            split_results[str(repeat)] = {}
+            split_int_results = {}
+
+            rfi = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
+                                                 calixarene_csv_file=calixarene_csv_file,
+                                                 peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                 split_calixarene_dict=split_calixarene_dict,
+                                                 holdout_size=holdout_size,
+                                                 relative_training=True)
             
             # Initialize the Support Vector Regressor
             rfr = RandomForestRegressor(n_estimators=n_estimators,
@@ -725,46 +728,58 @@ def rf_structured_final(calixarene_csv_folder,
                                         bootstrap=bootstrap)
 
             # Train on the 'train' split
-            rfr.fit(svi['train']['features'], svi['train']['target'])
+            rfr.fit(rfi['train']['features'], rfi['train']['target'])
 
-            # Evaluate on 'test' split. Must re-shape the features, as it's a single sample.
-            predictions = rfr.predict(svi['test']['features'])
-            mse = mean_squared_error(svi['test']['target'], predictions)
-
-            #Organize lists
-            actual_values = svi['test']['target']
-            predicted_diffs = predictions
-            test_calix_positions = svi['test']['test_pos']
-            peptide_names = svi['test']['peptide_order']
-            known_calix_values = svi['test']['known_val']
-
-            # Create lists for storing intermediate results
-            split_int_results[calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
-            for actual, predicted_diff, position, peptide_name, known_calix in zip(
-                    actual_values, predicted_diffs, test_calix_positions, peptide_names, known_calix_values):
-                
-                # Calculate the predicted value for the unknown calix
-                if position == 'row1':
-                    predicted_value = predicted_diff + known_calix
-                    act_val = actual + known_calix  
+            # Evaluate on test split, one sample at a time
+            holdout_calix = rfi['holdout']
+            important_calix = [calix for calix in holdout_calix if calix.split('_')[0][0] in ['A', 'E', 'P']]
+            # Create overall list for each calix
+            print('Important calix are:', important_calix)
+            # Organize lists. Each entry is a 3 position tuple (calix_1, calix_2, peptide)
+            for entry in rfi['test']:
+                if entry[0] in important_calix:
+                    curr_calix = entry[0]
+                elif entry[1] in important_calix:
+                    curr_calix = entry[1]
                 else:
-                    predicted_value = -1 * (predicted_diff - known_calix)
-                    act_val = -1 * (actual - known_calix) 
+                    continue
 
-                # Append the actual and predicted values to the loo_int_results dictionary
-                split_int_results[calix][peptide_name]['actual'].append(act_val)
-                split_int_results[calix][peptide_name]['predicted'].append(predicted_value)
+                test_entry = np.concatenate((rfi['test'][entry]['ECFP'], rfi['test'][entry]['Peptide_OH']), axis=0)
+                predicted_diff = rfr.predict(test_entry.reshape(1, -1))
+                actual_value = rfi['test'][entry]['Target_Val']
+                test_calix_position = rfi['test'][entry]['test_pos']
+                peptide_name = entry[2]
+                known_calix_value = rfi['test'][entry]['known_val']
 
-            split_results[calix] = {name: {'actual': np.mean(split_int_results[calix][name]['actual']),
-                                               'predicted': np.mean(split_int_results[calix][name]['predicted'])} for name in peptide_name_list}
+                # Create lists for storing intermediate results
+                if curr_calix not in split_int_results:
+                    split_int_results[curr_calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
+                  
+                    # Calculate the predicted value for the unknown calix
+                    if test_calix_position == 'row1':
+                        predicted_value = predicted_diff + known_calix_value
+                        act_val = actual_value + known_calix_value  
+                    else:
+                        predicted_value = -1 * (predicted_diff - known_calix_value)
+                        act_val = -1 * (actual_value - known_calix_value) 
+
+                    # Append the actual and predicted values to the loo_int_results dictionary
+                    split_int_results[curr_calix][peptide_name]['actual'].append(act_val)
+                    split_int_results[curr_calix][peptide_name]['predicted'].append(predicted_value)
+
+            for measured_calix in important_calix:
+                print(measured_calix)
+                print(split_results[str(repeat)][measured_calix])
+                split_results[str(repeat)][measured_calix] = {name: {'actual': np.mean(split_int_results[measured_calix][name]['actual']),
+                                                'predicted': np.mean(split_int_results[measured_calix][name]['predicted'])} for name in peptide_name_list}
 
         else:
-            svi, peptide_name_list = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
-                                                                    calixarene_csv_file=calixarene_csv_file,
-                                                                    peptide_one_hot_encoding=peptide_one_hot_encoding,
-                                                                    split_calixarene_dict=split_calixarene_dict,
-                                                                    holdout_size=holdout_size,
-                                                                    relative_training=False)
+            rfi = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
+                                                 calixarene_csv_file=calixarene_csv_file,
+                                                 peptide_one_hot_encoding=peptide_one_hot_encoding,
+                                                 split_calixarene_dict=split_calixarene_dict,
+                                                 holdout_size=holdout_size,
+                                                 relative_training=False)
 
             # Initialize the Support Vector Regressor
             rfr = RandomForestRegressor(n_estimators=n_estimators,
@@ -774,15 +789,17 @@ def rf_structured_final(calixarene_csv_folder,
                                         bootstrap=bootstrap)
 
             # Train on the 'train' split
-            rfr.fit(svi['train']['features'], svi['train']['target'])
+            rfr.fit(rfi['train']['features'],rfi['train']['target'])
 
+            # Only predict key calixarenes for comparison to LOO results
             split_results[str(repeat)] = {}
-            for entry in svi['test']:
-                if entry.split('_')[0] not in split_results[str(repeat)]:
-                    split_results[str(repeat)][entry.split('_')[0]] = []
-                test_entry = np.concatenate((svi['test'][entry]['ECFP'], svi['test'][entry]['Peptide_OH']), axis=0)
-                curr_pred = rfr.predict(test_entry.reshape(1, -1))
-                split_results[str(repeat)][entry.split('_')[0]].append((curr_pred[0], svi['test'][entry]['Target_Val']))
+            for entry in rfi['test']:
+                if entry.split('_')[0][0] in ['A', 'E', 'P']:
+                    if entry.split('_')[0] not in split_results[str(repeat)]:
+                        split_results[str(repeat)][entry.split('_')[0]] = []
+                    test_entry = np.concatenate((rfi['test'][entry]['ECFP'], rfi['test'][entry]['Peptide_OH']), axis=0)
+                    curr_pred = rfr.predict(test_entry.reshape(1, -1))
+                    split_results[str(repeat)][entry.split('_')[0]].append((curr_pred[0], rfi['test'][entry]['Target_Val']))
 
     # Save the dictionary to a pickle file
     with open(output_name, 'wb') as f:
