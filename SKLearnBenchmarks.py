@@ -734,7 +734,6 @@ def rf_structured_final(calixarene_csv_folder,
             holdout_calix = rfi['holdout']
             important_calix = [calix for calix in holdout_calix if calix.split('_')[0][0] in ['A', 'E', 'P']]
             # Create overall list for each calix
-            print('Important calix are:', important_calix)
             # Organize lists. Each entry is a 3 position tuple (calix_1, calix_2, peptide)
             for entry in rfi['test']:
                 if entry[0] in important_calix:
@@ -755,23 +754,20 @@ def rf_structured_final(calixarene_csv_folder,
                 if curr_calix not in split_int_results:
                     split_int_results[curr_calix] = {name: {'actual': [], 'predicted': []} for name in peptide_name_list}
                   
-                    # Calculate the predicted value for the unknown calix
-                    if test_calix_position == 'row1':
-                        predicted_value = predicted_diff + known_calix_value
-                        act_val = actual_value + known_calix_value  
-                    else:
-                        predicted_value = -1 * (predicted_diff - known_calix_value)
-                        act_val = -1 * (actual_value - known_calix_value) 
+                # Calculate the predicted value for the unknown calix
+                if test_calix_position == 'row1':
+                    predicted_value = predicted_diff + known_calix_value
+                    act_val = actual_value + known_calix_value  
+                else:
+                    predicted_value = -1 * (predicted_diff - known_calix_value)
+                    act_val = -1 * (actual_value - known_calix_value) 
 
-                    # Append the actual and predicted values to the loo_int_results dictionary
-                    split_int_results[curr_calix][peptide_name]['actual'].append(act_val)
-                    split_int_results[curr_calix][peptide_name]['predicted'].append(predicted_value)
+                # Append the actual and predicted values to the loo_int_results dictionary
+                split_int_results[curr_calix][peptide_name]['actual'].append(act_val)
+                split_int_results[curr_calix][peptide_name]['predicted'].append(predicted_value)
 
             for measured_calix in important_calix:
-                print(measured_calix)
-                print(split_results[str(repeat)][measured_calix])
-                split_results[str(repeat)][measured_calix] = {name: {'actual': np.mean(split_int_results[measured_calix][name]['actual']),
-                                                'predicted': np.mean(split_int_results[measured_calix][name]['predicted'])} for name in peptide_name_list}
+                split_results[str(repeat)][measured_calix] = [(np.mean(split_int_results[measured_calix][name]['predicted']), np.mean(split_int_results[measured_calix][name]['actual'])) for name in peptide_name_list]
 
         else:
             rfi = create_structured_ECFP_dataset(calixarene_csv_folder=calixarene_csv_folder,
