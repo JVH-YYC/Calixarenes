@@ -812,6 +812,38 @@ split_calix_dict = {'predictable': ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
                     'unpredictable': ['BP0', 'BP1', 'BH2', 'BM1', 'CP1',
                                       'CP2', 'DP2', 'DM1', 'DO2', 'DO3']}
 
+# Final RF testing
+for holdout_amt in [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]:
+    output_name = '20 split ' + str(holdout_amt) + ' HO RF absolute.pkl'
+    rf_structured_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+                        calixarene_csv_file='calix smiles absolute.csv',
+                        peptide_one_hot_encoding='one_hot_short.csv',
+                        holdout_size=holdout_amt,
+                        num_trials=20,
+                        relative_training=False,
+                        split_calixarene_dict=split_calix_dict,
+                        output_name=output_name,
+                        n_estimators=100,
+                        max_depth=10,
+                        min_samples_split=2,
+                        min_samples_leaf=4,
+                        bootstrap=True)
+    
+    output_name_2 = '20 split ' + str(holdout_amt) + ' HO RF relative.pkl'
+    rf_structured_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+                        calixarene_csv_file='calix smiles absolute.csv',
+                        peptide_one_hot_encoding='one_hot_short.csv',
+                        holdout_size=holdout_amt,
+                        num_trials=20,
+                        relative_training=True,
+                        split_calixarene_dict=split_calix_dict,
+                        output_name=output_name_2,
+                        n_estimators=100,
+                        max_depth=10,
+                        min_samples_split=2,
+                        min_samples_leaf=4,
+                        bootstrap=True)
+
 # calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
 #                    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
 #                    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',

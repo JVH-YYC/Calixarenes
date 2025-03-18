@@ -12,59 +12,93 @@ Top level function for training CNN network: UVic calixarene project V2
 import ResNet.CalixNet as CNN
 import DataLoaders.CDKDataLoader as CDL
 
-# Initial training of the network
-initial_calix_list = ['E11', 'BH2', 'BP0', 'AH2', 'AH1',
-                      'DM1', 'BM1', 'AM2', 'AM1', 'DP2',
-                      'CP2', 'CP1', 'BP1', 'PNO2', 'PSC4',
-                      'AH4', 'AP9', 'AH3', 'AP8', 'AP7',
-                      'AP6', 'E8', 'AP5', 'E7', 'AP4', 'E6',
-                      'AP3', 'E3', 'AP1', 'E1', 'DO3', 'DO2',
-                      'AO3', 'AO2', 'AO1', 'AH7', 'AH6', 'AH5']
+# Training on different splits of the data. 20 repeats
+split_calix_dict = {'predictable': ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
+                                    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+                                    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+                                    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+                                    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+                                    'PNO2', 'PSC4'],
+                    'unpredictable': ['BP0', 'BP1', 'BH2', 'BM1', 'CP1',
+                                      'CP2', 'DP2', 'DM1', 'DO2', 'DO3']}
 
-for calix in initial_calix_list:
-    print('Processing calixarene:', calix)
-    pq_file_directory = 'PQFiles'
-    pq_file_name = 'AlokThesis10A_Comb.pq'
-    csv_file_directory = 'CSVFiles'
-    binding_file = 'Data excluding non-binders.csv'
-    one_hot_file = 'one_hot_short.csv'
-    exclude_calix = ['E9', 'F2', 'F3', 'F4']
-    test_set = [calix,]
-    output_name ='Rel LOO no F ' + calix
-    batch_size = 400
-    val_split = 0.1
-    min_epochs = 100
-    training_epochs = 400
-    learning_rate = 0.00033
-    lr_patience = 30
-    resnet_block_list = [2,2,3,4]
-    dropout_amount = 0.3
-    absolute_training = False
-    absolute_predictions = False
-    classification = False
-    # state_dict_directory = '/home/jvh/Desktop/Trained Calix ResNets/'
-    # state_dict_name = 'First Inverse Training E_iter_0.pt'
+for ho_amt in [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]:
+    ho_name = '20 split ' + str(ho_amt) + ' HO CNN absolute.pkl'
+    CNN.cnn_training_split_workflow(pq_file_directory='/home/jvh/Documents/GitHub/Calixarenes/PQFiles',
+                                    pq_file_name='AlokThesis10A_Comb.pq',
+                                    csv_file_directory='/home/jvh/Documents/GitHub/Calixarenes/CSVFiles',
+                                    binding_file='Data excluding non-binders.csv',
+                                    one_hot_file='one_hot_short.csv',
+                                    split_calixarene_dict=split_calix_dict,
+                                    holdout_size=ho_amt,
+                                    output_name=ho_name,
+                                    batch_size=400,
+                                    val_split=0.1,
+                                    min_epochs=100,
+                                    training_epochs=400,
+                                    learning_rate=0.000067,
+                                    lr_patience=30,
+                                    resnet_block_list=[3,3,3,3],
+                                    dropout_amount=0.04,
+                                    absolute_training=True,
+                                    absolute_predictions=True,
+                                    save_model=False,
+                                    classification=False)
 
-    CNN.cnn_work_flow(pq_file_directory=pq_file_directory,
-                    pq_file_name=pq_file_name,
-                    csv_file_directory=csv_file_directory,
-                    binding_file=binding_file,
-                    one_hot_file=one_hot_file,
-                    exclude_calix=exclude_calix,
-                    test_set=test_set,
-                    output_name=output_name,
-                    batch_size=batch_size,
-                    val_split=val_split,
-                    min_epochs=min_epochs,
-                    training_epochs=training_epochs,
-                    learning_rate=learning_rate,
-                    lr_patience=lr_patience,
-                    resnet_block_list=resnet_block_list,
-                    dropout_amount=dropout_amount,
-                    absolute_training=absolute_training,
-                    absolute_predictions=absolute_predictions,
-                    save_model=True,
-                    classification=classification)
+
+# # Initial training of the network
+# initial_calix_list = ['E11', 'BH2', 'BP0', 'AH2', 'AH1',
+#                       'DM1', 'BM1', 'AM2', 'AM1', 'DP2',
+#                       'CP2', 'CP1', 'BP1', 'PNO2', 'PSC4',
+#                       'AH4', 'AP9', 'AH3', 'AP8', 'AP7',
+#                       'AP6', 'E8', 'AP5', 'E7', 'AP4', 'E6',
+#                       'AP3', 'E3', 'AP1', 'E1', 'DO3', 'DO2',
+#                       'AO3', 'AO2', 'AO1', 'AH7', 'AH6', 'AH5']
+
+# for calix in initial_calix_list:
+#     print('Processing calixarene:', calix)
+#     pq_file_directory = 'PQFiles'
+#     pq_file_name = 'AlokThesis10A_Comb.pq'
+#     csv_file_directory = 'CSVFiles'
+#     binding_file = 'Data excluding non-binders.csv'
+#     one_hot_file = 'one_hot_short.csv'
+#     exclude_calix = ['E9', 'F2', 'F3', 'F4']
+#     test_set = [calix,]
+#     output_name ='Rel LOO no F ' + calix
+#     batch_size = 400
+#     val_split = 0.1
+#     min_epochs = 100
+#     training_epochs = 400
+#     learning_rate = 0.00033
+#     lr_patience = 30
+#     resnet_block_list = [2,2,3,4]
+#     dropout_amount = 0.3
+#     absolute_training = False
+#     absolute_predictions = False
+#     classification = False
+#     # state_dict_directory = '/home/jvh/Desktop/Trained Calix ResNets/'
+#     # state_dict_name = 'First Inverse Training E_iter_0.pt'
+
+#     CNN.cnn_work_flow(pq_file_directory=pq_file_directory,
+#                     pq_file_name=pq_file_name,
+#                     csv_file_directory=csv_file_directory,
+#                     binding_file=binding_file,
+#                     one_hot_file=one_hot_file,
+#                     exclude_calix=exclude_calix,
+#                     test_set=test_set,
+#                     output_name=output_name,
+#                     batch_size=batch_size,
+#                     val_split=val_split,
+#                     min_epochs=min_epochs,
+#                     training_epochs=training_epochs,
+#                     learning_rate=learning_rate,
+#                     lr_patience=lr_patience,
+#                     resnet_block_list=resnet_block_list,
+#                     dropout_amount=dropout_amount,
+#                     absolute_training=absolute_training,
+#                     absolute_predictions=absolute_predictions,
+#                     save_model=True,
+#                     classification=classification)
 
     # CNN.load_and_test_saved_model(state_dict_directory,
     #                             state_dict_name,

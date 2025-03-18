@@ -857,6 +857,85 @@ def cnn_work_flow(pq_file_directory,
     
     return training_log, network, test_loss
 
+def cnn_training_split_workflow(pq_file_directory,
+                                pq_file_name,
+                                csv_file_directory,
+                                binding_file,
+                                one_hot_file,
+                                split_calixarene_dict,
+                                holdout_size,
+                                output_name,
+                                batch_size,
+                                val_split,
+                                min_epochs,
+                                training_epochs,
+                                learning_rate,
+                                lr_patience,
+                                resnet_block_list,
+                                dropout_amount,
+                                absolute_training,
+                                absolute_predictions,
+                                save_model=False,
+                                classification=False):
+    """
+    Final workflow for evaluating different sizes of training set split (in both rel and absolute modes)
+
+    In both cases, 20 repeats at each split size
+    """
+    final_pickle_dict = {}
+
+    for repeat in range(20):
+    # Select calixarenes to make up the test set, using 'preditable' and 'unpredictable' splits of calixarenes
+        print('Beginning repeat:', repeat)
+        holdout_pred_amount = int(len(split_calixarene_dict['predictable']) * holdout_size)
+        holdout_unpred_amount = int(len(split_calixarene_dict['unpredictable']) * holdout_size)
+
+        holdout_calixarenes_pred = random.sample(split_calixarene_dict['predictable'], holdout_pred_amount)
+        holdout_calixarenes_unpred = random.sample(split_calixarene_dict['unpredictable'], holdout_unpred_amount)
+        all_holdout_calix = holdout_calixarenes_pred + holdout_calixarenes_unpred
+
+        training_log, network, test_loss = cnn_work_flow(pq_file_directory=pq_file_directory,
+                                                        pq_file_name=pq_file_name,
+                                                        csv_file_directory=csv_file_directory,
+                                                        binding_file=binding_file,
+                                                        one_hot_file=one_hot_file,
+                                                        exclude_calix=['E9', 'F2', 'F3', 'F4'],
+                                                        test_set=all_holdout_calix,
+                                                        output_name=output_name,
+                                                        batch_size=batch_size,
+                                                        val_split=val_split,
+                                                            min_epochs=min_epochs,
+                                                            training_epochs=training_epochs,
+                                                            learning_rate=learning_rate,
+                                                            lr_patience=lr_patience,
+                                                            resnet_block_list=resnet_block_list,
+                                                            dropout_amount=dropout_amount,
+                                                            absolute_training=absolute_training,
+                                                            absolute_predictions=absolute_predictions,
+                                                            save_model=False,
+                                                            classification=False)
+    
+    # Re-create dataset object. Don't change cnn_work_flow to export dataset to avoid breaking old code
+        if absolute_training == False:
+            adsorption_data = RelativeAdsorptionDataset(pq_file_directory=pq_file_directory,
+                                                        pq_file_name=pq_file_name,
+                                                        csv_file_directory=csv_file_directory,
+                                                        binding_file=binding_file,
+                                                        one_hot_file=one_hot_file,
+                                                        exclude_calix=['E9', 'F2', 'F3', 'F4'],
+                                                        test_set=all_holdout_calix,
+                                                        batch_size=batch_size)
+            
+            curr_test_results = create_absolute_prediction_standard_dict(network,
+                                                                         adsorption_data)
+            final_pickle_dict[str(repeat)] = curr_test_results
+
+    # Save the dictionary to a pickle file
+    with open(output_name, 'wb') as f:
+        pickle.dump(final_pickle_dict, f)
+
+    return final_pickle_dict
+
 def batch_work_flow(file_name_variable,
                     pq_file_directory,
                     pq_file_name_list,
@@ -1411,6 +1490,28 @@ def single_abs_test_pass(network,
                                                       'actual': final_act_dict[calix_host][peptide]}
 
     return test_return_dict
+
+def create_absolute_prediction_standard_dict(network,
+                                             dataset_obj):
+    """
+    A function that takes a trained network and dataset object, and creates a dictionary
+    of predicted vs. actual values organized by host in the standard format for future comparisons.
+    """
+
+    organized_return_dict = {}
+    peptide_list = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+
+    results_dict = single_abs_test_pass(network,
+                                        dataset_obj,
+                                        absolute_training=True)
+
+    # Convert CNN results dict to standard analysis dictionary format
+    for calix_host in results_dict.keys():
+        organized_return_dict[calix_host] = []
+        for peptide in peptide_list:
+            organized_return_dict[calix_host].append((results_dict[calix_host][peptide]['predicted'], results_dict[calix_host][peptide]['actual']))
+    
+    return organized_return_dict
 
 def plot_act_pred(predicted_data,
                   actual_data,

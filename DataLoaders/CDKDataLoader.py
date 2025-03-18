@@ -245,7 +245,7 @@ def simple_enumerate_set(binding_file,
         for entry in range(len(prefix_list)):
             training_calix_list.append(prefix_list[entry])
             peptide_list.append(peptide)
-            log_absolute_values.append(np.log(adsorption_frame.at[prefix_list[entry], peptide]))
+            log_absolute_values.append(np.log(float(adsorption_frame.at[prefix_list[entry], peptide])))
 
     return training_calix_list, peptide_list, log_absolute_values
 
