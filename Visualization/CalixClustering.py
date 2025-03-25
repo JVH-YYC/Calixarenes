@@ -1,11 +1,15 @@
 """
 First clustering file
 """
+import importlib
 import umap
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
+import calix_visual_settings as CVS
+
+importlib.reload(CVS)
 
 def import_csv_and_craft(csv_file_directory,
                          csv_file_name,
@@ -42,7 +46,7 @@ def import_csv_and_craft(csv_file_directory,
 
     Returns
     -------
-    None.
+    A pandas DataFrame organized according to the input parameters
 
     """
 
@@ -122,8 +126,7 @@ def parse_range_list(ordered_list,
     # Return the list of column names
     return column_names
 
-def create_umap_cluster_frame(umap_cluster_dict,
-                              umap_constant_settings,
+def create_umap_cluster_frame(starting_dataframe,
                               n_neighbors,
                               min_dist):
     """
@@ -143,31 +146,26 @@ def create_umap_cluster_frame(umap_cluster_dict,
     None.
 
     """
-
-    cluster_data_frame = import_csv_and_craft(umap_cluster_dict['csv_file_directory'],
-                                                  umap_cluster_dict['csv_file_name'],
-                                                  umap_cluster_dict['target_column_list'],
-                                                  umap_cluster_dict['data_column_list'],
-                                                  umap_cluster_dict['target_mode'],
-                                                  umap_cluster_dict['data_mode'])
     
-    reducer = umap.UMAP(**umap_constant_settings,
+    reducer = umap.UMAP(metric='euclidean',
+                        spread=3,
                         n_neighbors=n_neighbors,
                         min_dist=min_dist)
     
     #Remove labels from dataframe
-    data_only_frame = cluster_data_frame.drop(columns=[col for col in cluster_data_frame.columns if col in umap_cluster_dict['target_column_list']])
+    #data_only_frame = starting_dataframe.drop(columns=[col for col in starting_dataframe.columns if col in umap_cluster_dict['target_column_list']])
 
     #Create x and y plot values from UMAP
-    scatter_data = reducer.fit_transform(data_only_frame)
+    scatter_data = reducer.fit_transform(starting_dataframe)
 
-    cluster_data_frame['X'] = scatter_data[:, 0]
-    cluster_data_frame['Y'] = scatter_data[:, 1]
+    starting_dataframe['X'] = scatter_data[:, 0]
+    starting_dataframe['Y'] = scatter_data[:, 1]
                          
-    return cluster_data_frame
+    return starting_dataframe
 
 def create_umap_scatter(umap_cluster_dataframe,
-                        scatter_plot_dict):
+                        scatter_plot_dict,
+                        output_name):
     """
     
 
@@ -191,25 +189,67 @@ def create_umap_scatter(umap_cluster_dataframe,
     fig, ax = plt.subplots(figsize=(scatter_plot_dict['plot_width'],
                                     scatter_plot_dict['plot_height']))
 
-    #Set up marker color. 'palette', 'num_shades', and 'shade_choice' have the structure of a dictionary of dictionaries
-    #The first key in the dictionary is the column name to search. The second key maps a value found in that column to
-    #the values of interest
+    # Use the first letter of each index entry to determine the color.
+    marker_color_list = [
+        sns.color_palette(
+            scatter_plot_dict['calix_color'][str(idx)[0]][0],
+            scatter_plot_dict['calix_color'][str(idx)[0]][1]
+        )[scatter_plot_dict['calix_color'][str(idx)[0]][2]]
+        for idx in umap_cluster_dataframe.index
+    ]
+    opacity = scatter_plot_dict['marker_opacity']
+    marker_type = scatter_plot_dict['marker_type']    
     
-    color_column = list(scatter_plot_dict['marker_colors'])[0]
-    marker_color_list = [sns.color_palette(scatter_plot_dict['marker_colors'][color_column][marker_value][0],
-                          scatter_plot_dict['marker_colors'][color_column][marker_value][1])[scatter_plot_dict['marker_colors'][color_column][marker_value][2]] for marker_value in umap_cluster_dataframe[color_column]]
-
-    opacity_column = list(scatter_plot_dict['marker_opacity'])[0]
-    opacity_list = [scatter_plot_dict['marker_opacity'][opacity_column][marker_value] for marker_value in umap_cluster_dataframe[opacity_column]]
-
-    marker_type_column = list(scatter_plot_dict['marker_type'])[0]
-    marker_type_list = [scatter_plot_dict['marker_type'][marker_type_column][marker_value] for marker_value in umap_cluster_dataframe[marker_type_column]]
-   
-    #Iterate over points to make the plot
-    for x, y, color, opacity, marker_type in zip(x_val, y_val, marker_color_list, opacity_list, marker_type_list):
+    for x, y, color in zip(x_val, y_val, marker_color_list):
         plt.scatter(x, y, color=color, alpha=opacity, marker=marker_type)
+    
+    unique_letters = sorted(umap_cluster_dataframe.index.astype(str).str[0].unique())
+    legend_handles = []
+    for letter in unique_letters:
+        palette_name, num_shades, shade_index = scatter_plot_dict['calix_color'][letter]
+        color = sns.color_palette(palette_name, num_shades)[shade_index]
+        handle = plt.Line2D([], [], marker=marker_type, color=color, linestyle='None',
+                            markersize=10, label=letter, alpha=opacity)
+        legend_handles.append(handle)
+
+    # Add the legend to the plot
+    ax.legend(handles=legend_handles, title='Calixarene Scaffold')
+
+    # Save the plot with a unique suffix
+    plt.savefig(output_name)
+    plt.close(fig)
 
     return                             
+
+def color_by_scaffold_cluster(csv_file_directory,
+                              csv_file_name,
+                              umap_setting_dict,
+                              num_neighbors,
+                              min_dist,
+                              output_name):
+    """
+    A function that takes a .csv file with calixarene/peptide binding information, and creates a UMAP scatter plot
+    with each calixarene scaffold (i.e. 'A', 'B', 'C', 'D', 'E', 'P') as a different color.
+
+    By default (for publication), we are using all columns for clustering, so no UMAP dictionary is necessary
+    """
+
+    starting_frame = import_csv_and_craft(csv_file_directory=csv_file_directory,
+                                          csv_file_name=csv_file_name,
+                                          ordered_target_column_list=[],
+                                          ordered_data_column_list=[],
+                                          target_mode='all',
+                                          data_mode=None)
+    
+    umap_filled_frame = create_umap_cluster_frame(starting_dataframe=starting_frame,
+                                                  n_neighbors=num_neighbors,
+                                                  min_dist=min_dist)
+    
+    create_umap_scatter(umap_cluster_dataframe=umap_filled_frame,
+                        scatter_plot_dict=umap_setting_dict,
+                        output_name=output_name)
+    
+    return
 
 def kmeans_umap_plot(umap_cluster_dataframe,
                      n_clusters,
@@ -247,3 +287,4 @@ def kmeans_umap_plot(umap_cluster_dataframe,
     plt.title(f'UMAP Clustering with k={n_clusters}')
 
     return
+

@@ -16,16 +16,20 @@ For a final test (after LOO was completed), different amouts of test data were h
 The top-level key is simply the repeat round (from 0-19 for 20 repeats). Within these, each host points to a list of tuples, where the
 tuples are (predicted, actual) values. From these, one can calculate the same metrics as above.
 """
-
+import importlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 import numpy as np
 import pandas as pd
 import statistics
+import calix_visual_settings as CVS
+import matplotlib.patches as patches
 
 from sklearn.metrics import roc_curve, auc, r2_score, mean_squared_error
 from scipy.stats import pearsonr
+
+importlib.reload(CVS)
 
 def load_result_dict(result_folder,
                      result_filename):
@@ -583,6 +587,75 @@ def multi_scatter_plot(pickle_file_folder,
                 plt.savefig(output_name, bbox_inches='tight')
             else:
                 plt.show()   
+    return
+
+def calix_heatmap_from_csv(csv_folder,
+                           csv_file_name,
+                           output_name,
+                           output_file_type,
+                           heatmap_dict):
+    """
+    Docstring
+    """
+    # Read in the csv file
+    csv_file = os.path.join(csv_folder, csv_file_name)
+    df = pd.read_csv(csv_file, index_col=0, header=0)
+    
+    if heatmap_dict['log_val'] == True:
+        df = np.log10(df)
+
+    # Create the heatmap
+    cmap = sns.diverging_palette(20, 220, sep=5, n=100, as_cmap=True)
+    
+    vmin = np.log10(1e-3)
+    vmax = np.log10(1e2)
+    center = np.log10(0.5)
+
+    fig, ax = plt.subplots(figsize=(heatmap_dict['plot_width'],
+                                    heatmap_dict['plot_height']))
+    
+    sns.heatmap(df, cmap=cmap, center=center, vmin=vmin, vmax=vmax, ax=ax)
+    plt.subplots_adjust(left=0.2)
+
+    rect = patches.Rectangle((0, 0), 1, 1, transform=ax.transAxes, 
+                         fill=False, edgecolor='black', linewidth=1)
+    ax.add_patch(rect)
+
+    # Change font to DejaVu Sans for the row labels
+    for label in ax.get_yticklabels():
+        label.set_fontname(heatmap_dict['font_type'])
+        label.set_fontsize(heatmap_dict['y_font_size'])
+        label.align = 'left'   
+    
+    # Change font to DejaVus Sans for the column labels
+    for label in ax.get_xticklabels():
+        label.set_fontname(heatmap_dict['font_type'])
+        label.set_fontsize(heatmap_dict['x_font_size'])
+    
+    # Change font type and size for the colobar
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=heatmap_dict['tick_font_size'])
+
+    # Remove y-axis label
+    ax.set_ylabel('')
+
+    #Update tick positions if necessary
+    if heatmap_dict['tick_override'] == True:
+        cbar.set_ticks(heatmap_dict['tick_positions'])
+        cbar.set_ticklabels(heatmap_dict['tick_labels'])
+
+
+    cbar.outline.set_edgecolor('black')
+    cbar.outline.set_linewidth(1)    
+    
+    # Save the heatmap
+    plt.savefig(output_name,
+                dpi=300,
+                facecolor="white",
+                bbox_inches='tight',
+                pad_inches=0.05,
+                format=output_file_type)
+    plt.close()
     return
 
 

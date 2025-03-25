@@ -39,7 +39,7 @@ e4,BrC1=CC=C(S([Y])(=O)=O)C=C1,s
 e5,BrC1=CC=C(C([Y])=O)C=C1,s
 e6,[Y]C(OCC1=CC=CC=C1)=O,s
 e7,[Y]C(C1=C(F)C(F)=C(F)C(F)=C1F)=O,s
-e8,[Y]NC(NC1=CC=C(C)C=C1)=S,s
+e8,[Y]C(NC1=CC=C(C)C=C1)=S,s
 e9,[Y]S(C(C=C1)=CC=C1[N+]([O-])=O)(=O)=O,s
 e10,[Y]S(C1=C(Br)C=CC=C1)(=O)=O,s
 e11,[Y]S(C1=C(F)C(F)=C(F)C(F)=C1F)(=O)=O,s
