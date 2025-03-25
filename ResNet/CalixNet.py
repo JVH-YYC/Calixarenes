@@ -143,7 +143,6 @@ class ResNet(nn.Module):
         
         return nn.Sequential(*blocks)
     
-
 def ResNet18(input_block_list,
              dropout_amount,
              input_channels=4,
@@ -154,7 +153,6 @@ def ResNet18(input_block_list,
                   input_channels,
                   classification)
 
-        
 class RelativeAdsorptionDataset(Dataset):
     """ 
     Takes a .csv file with adsorption data
@@ -423,7 +421,6 @@ def val_train_indices(dataset,
     train_index, val_index = index_values[cutoff:], index_values[:cutoff]
     
     return train_index, val_index
-
 
 def loss_and_optim(network,
                     learning_rate,
@@ -924,8 +921,20 @@ def cnn_training_split_workflow(pq_file_directory,
                                                         one_hot_file=one_hot_file,
                                                         exclude_calix=['E9', 'F2', 'F3', 'F4'],
                                                         test_set=all_holdout_calix,
-                                                        batch_size=batch_size)
-            
+                                                        training_batch_size=batch_size)
+            curr_test_results = create_relative_prediction_standard_dict(network,
+                                                                         adsorption_data)
+            final_pickle_dict[str(repeat)] = curr_test_results
+
+        else:
+            adsorption_data = AbsoluteAdsorptionDataset(pq_file_directory=pq_file_directory,
+                                                        pq_file_name=pq_file_name,
+                                                        csv_file_directory=csv_file_directory,
+                                                        binding_file=binding_file,
+                                                        one_hot_file=one_hot_file,
+                                                        exclude_calix=['E9', 'F2', 'F3', 'F4'],
+                                                        test_set=all_holdout_calix,
+                                                        training_batch_size=batch_size)
             curr_test_results = create_absolute_prediction_standard_dict(network,
                                                                          adsorption_data)
             final_pickle_dict[str(repeat)] = curr_test_results
@@ -1511,6 +1520,28 @@ def create_absolute_prediction_standard_dict(network,
         for peptide in peptide_list:
             organized_return_dict[calix_host].append((results_dict[calix_host][peptide]['predicted'], results_dict[calix_host][peptide]['actual']))
     
+    return organized_return_dict
+
+def create_relative_prediction_standard_dict(network,
+                                             dataset_obj):
+    """
+    A complementary function that that above; takes a trained network and dataset object, creates a dictionary
+    of predicted vs. actual values organized by host in the standard format for future comparison.
+    """
+
+    organized_return_dict = {}
+    peptide_list = ['H3K4', 'H3K4ac', 'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K9me3', 'H3R2me2a', 'H3R2me2s']
+
+    results_dict = single_abs_test_pass(network,
+                                        dataset_obj,
+                                        absolute_training=False)
+    
+    # Convert CNN results dict to standard analysis dictionary format
+    for calix_host in results_dict.keys():
+        organized_return_dict[calix_host] = []
+        for peptide in peptide_list:
+            organized_return_dict[calix_host].append((results_dict[calix_host][peptide]['predicted'], results_dict[calix_host][peptide]['actual']))
+
     return organized_return_dict
 
 def plot_act_pred(predicted_data,
