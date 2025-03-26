@@ -25,6 +25,7 @@ import pandas as pd
 import statistics
 import calix_visual_settings as CVS
 import matplotlib.patches as patches
+import pickle
 
 from sklearn.metrics import roc_curve, auc, r2_score, mean_squared_error
 from scipy.stats import pearsonr
@@ -304,6 +305,52 @@ def calculate_bothr2_by_holdout(result_folder,
         results_dict[holdout_amt]['adj_r2_success'] = adj_r2_success
         results_dict[holdout_amt]['summed_success'] = abs_r2_success + adj_r2_success
     return results_dict
+
+def evaluate_test_split_size(pickle_file_folder,
+                             leading_string,
+                             following_string,
+                             holdout_amounts):
+    """
+    Another related workflow that looks at series of different test-holdout splits.
+
+    Each of these holdouts was repeated 20x, and pickled as a dictionary. Top-level keys are the repeat number (str(0) to str(19)),
+    following by the (predictable) calixarene in the test set (e.g. 'AP8':), which points to a list of [(predicted, actual), (predicted, actual)]
+
+    Use existing functions to measure R2 and adjusted R2. Report the median adj R2, as well as the number of calixarenes with absolute R2 > 0.7,
+    and adjusted R2 >0.7 (i.e. 'A+U')
+
+    CNN output saves as single-item lists, so need to extract the value from the list 
+    """
+
+    for curr_holdout in holdout_amounts:
+        curr_pickle_name = leading_string + str(curr_holdout) + following_string
+        curr_results = load_result_dict(pickle_file_folder,
+                                        curr_pickle_name)
+        all_absolute_r2 = []
+        all_adjusted_r2 = []
+        for repeat_trial in curr_results.keys():
+            for curr_calix in curr_results[repeat_trial]:
+                if curr_calix[0] in ['A', 'E', 'P']:
+                    calix_results = curr_results[repeat_trial][curr_calix]
+                    curr_predict = [x[0] if isinstance(x[0], float) else x[0][0] for x in calix_results]
+                    curr_actual = [x[1] if isinstance(x[1], float) else x[1][0] for x in calix_results]
+                    mse, r2, adjusted_r2, shift_amount = calculate_metrics(curr_predict, curr_actual)
+                    all_absolute_r2.append(r2)
+                    all_adjusted_r2.append(adjusted_r2)
+        
+        median_r2 = statistics.median(all_absolute_r2)
+        median_adj_r2 = statistics.median(all_adjusted_r2)
+
+        abs_r2_success = sum([1 for x in all_absolute_r2 if x > 0.7]) / len(all_absolute_r2)
+        adj_r2_success = sum([1 for x, y in zip(all_absolute_r2, all_adjusted_r2) if x <= 0.7 and y > 0.7]) / len(all_absolute_r2)
+
+        print('For holdout:', curr_holdout)
+        print(f"Median R2: {median_r2}")
+        print(f"Median Adjusted R2: {median_adj_r2}")
+        print(f"Fraction of Calixarenes with R2 > 0.7: {abs_r2_success}")
+        print(f"Fraction of Calixarenes with R2 <= 0.7 and Adjusted R2 > 0.7: {adj_r2_success}")
+
+    return 
 
 def multi_scatter_plot(pickle_file_folder,
                     list_of_pickle_files,
