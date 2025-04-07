@@ -401,8 +401,9 @@ def loo_random_forest_final(calixarene_csv_folder,
     loo_int_results = {}
     # Loop through each calixarene
     for calix in calixarene_list:
+        print('Processing:', calix)
         # Create the dataset
-        if relative_training is not None:
+        if relative_training==True:
             rfi, peptide_name_list = create_LOO_relative_datasets(calixarene_csv_folder=calixarene_csv_folder,
                                                calixarene_csv_file=calixarene_csv_name,
                                                peptide_one_hot_encoding=peptide_one_hot_encoding,
@@ -813,45 +814,45 @@ split_calix_dict = {'predictable': ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
                                       'CP2', 'DP2', 'DM1', 'DO2', 'DO3']}
 
 # Final RF testing
-for holdout_amt in [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]:
-    output_name = '20 split ' + str(holdout_amt) + ' HO RF absolute.pkl'
-    rf_structured_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
-                        calixarene_csv_file='calix smiles absolute.csv',
-                        peptide_one_hot_encoding='one_hot_short.csv',
-                        holdout_size=holdout_amt,
-                        num_trials=20,
-                        relative_training=False,
-                        split_calixarene_dict=split_calix_dict,
-                        output_name=output_name,
-                        n_estimators=100,
-                        max_depth=10,
-                        min_samples_split=2,
-                        min_samples_leaf=4,
-                        bootstrap=True)
+# for holdout_amt in [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]:
+#     output_name = '20 split ' + str(holdout_amt) + ' HO RF absolute.pkl'
+#     rf_structured_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+#                         calixarene_csv_file='calix smiles absolute.csv',
+#                         peptide_one_hot_encoding='one_hot_short.csv',
+#                         holdout_size=holdout_amt,
+#                         num_trials=20,
+#                         relative_training=False,
+#                         split_calixarene_dict=split_calix_dict,
+#                         output_name=output_name,
+#                         n_estimators=100,
+#                         max_depth=10,
+#                         min_samples_split=2,
+#                         min_samples_leaf=4,
+#                         bootstrap=True)
     
-    output_name_2 = '20 split ' + str(holdout_amt) + ' HO RF relative.pkl'
-    rf_structured_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
-                        calixarene_csv_file='calix smiles absolute.csv',
-                        peptide_one_hot_encoding='one_hot_short.csv',
-                        holdout_size=holdout_amt,
-                        num_trials=20,
-                        relative_training=True,
-                        split_calixarene_dict=split_calix_dict,
-                        output_name=output_name_2,
-                        n_estimators=100,
-                        max_depth=10,
-                        min_samples_split=2,
-                        min_samples_leaf=4,
-                        bootstrap=True)
+#     output_name_2 = '20 split ' + str(holdout_amt) + ' HO RF relative.pkl'
+#     rf_structured_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+#                         calixarene_csv_file='calix smiles absolute.csv',
+#                         peptide_one_hot_encoding='one_hot_short.csv',
+#                         holdout_size=holdout_amt,
+#                         num_trials=20,
+#                         relative_training=True,
+#                         split_calixarene_dict=split_calix_dict,
+#                         output_name=output_name_2,
+#                         n_estimators=100,
+#                         max_depth=10,
+#                         min_samples_split=2,
+#                         min_samples_leaf=4,
+#                         bootstrap=True)
 
-# calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
-#                    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
-#                    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
-#                    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
-#                    'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
-#                    'CP2', 'DP2', 'DM1', 'DO2', 'DO2', 'DO3',
-#                    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
-#                    'P-NO2', 'PSC4']
+calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
+                   'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+                   'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+                   'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+                   'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
+                   'CP2', 'DP2', 'DM1', 'DO2',  'DO3',
+                   'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+                   'P-NO2', 'PSC4']
 
 # rfi = create_single_split_ECFP_dataset('Featurization/',
 #                                        'calix smiles absolute.csv',

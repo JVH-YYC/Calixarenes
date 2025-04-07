@@ -23,7 +23,7 @@ split_calix_dict = {'predictable': ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
                                       'CP2', 'DP2', 'DM1', 'DO2', 'DO3']}
 
 for ho_amt in [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]:
-    ho_name = '20 split ' + str(ho_amt) + ' HO CNN absolute.pkl'
+    ho_name = '20 split ' + str(ho_amt) + ' HO CNN relative.pkl'
     CNN.cnn_training_split_workflow(pq_file_directory='/home/jvh/Documents/GitHub/Calixarenes/PQFiles',
                                     pq_file_name='AlokThesis10A_Comb.pq',
                                     csv_file_directory='/home/jvh/Documents/GitHub/Calixarenes/CSVFiles',
@@ -36,11 +36,11 @@ for ho_amt in [0.05, 0.1, 0.15, 0.25, 0.5, 0.75]:
                                     val_split=0.1,
                                     min_epochs=100,
                                     training_epochs=400,
-                                    learning_rate=0.000067,
+                                    learning_rate=0.00033,
                                     lr_patience=30,
-                                    resnet_block_list=[3,3,3,3],
-                                    dropout_amount=0.04,
-                                    absolute_training=True,
+                                    resnet_block_list=[2,2,3,4],
+                                    dropout_amount=0.3,
+                                    absolute_training=False,
                                     absolute_predictions=True,
                                     save_model=False,
                                     classification=False)

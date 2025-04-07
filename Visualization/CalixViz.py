@@ -269,6 +269,26 @@ def calculate_and_save_all_metrics(organized_dict,
     
     return
 
+def simple_calc_metrics_for_LOO(organized_dict):
+    """
+    Assumes a simple results dictionary (as from SKLearnBenchmarks LOO)
+    Loops through individual calixarenes and prints R2 and adj R2
+    """
+
+    for entry in organized_dict:
+        print('For calixarene:', entry)
+        curr_results = organized_dict[entry]
+        curr_pred = []
+        curr_act = []
+        for peptide in curr_results:
+            curr_pred.append(curr_results[peptide]['predicted'])
+            curr_act.append(curr_results[peptide]['actual'])
+        mse, r2, adj_r2, shift_amount = calculate_metrics(curr_pred, curr_act)
+        print('R2:', r2)
+        print('Adj R2:', adj_r2)
+
+    return
+
 def calculate_bothr2_by_holdout(result_folder,
                                 dict_of_holdout_amounts):
     """
@@ -291,19 +311,22 @@ def calculate_bothr2_by_holdout(result_folder,
             for curr_calix in curr_dict[repeat_trial]:
                 if curr_calix[0] in ['A', 'E', 'P']:
                     curr_results = curr_dict[repeat_trial][curr_calix]
-                    curr_predict = [x[0] for x in curr_results]
-                    curr_actual = [x[1] for x in curr_results]
+                    curr_predict = [x[0][0] if isinstance(x[0], list) else x[0] for x in curr_results]
+                    curr_actual = [x[1][0] if isinstance(x[1], list) else x[1] for x in curr_results]
                     mse, r2, adjusted_r2, shift_amount = calculate_metrics(curr_predict, curr_actual)
                     all_r2.append(r2)
                     all_adj_r2.append(adjusted_r2)
         
-        abs_r2_success = sum([1 for x in all_r2 if x > 0.6]) / len(all_r2)
-        adj_r2_success = sum([1 for x, y in zip(all_r2, all_adj_r2) if x <= 0.6 and y > 0.6]) / len(all_r2)
+        abs_r2_success = sum([1 for x in all_r2 if x > 0.7]) / len(all_r2)
+        adj_r2_success = sum([1 for x, y in zip(all_r2, all_adj_r2) if x <= 0.7 and y > 0.7]) / len(all_r2)
         results_dict[holdout_amt]['r2_median'] = statistics.median(all_r2)
+        results_dict[holdout_amt]['r2_average'] = statistics.mean(all_r2)
         results_dict[holdout_amt]['r2_success'] = abs_r2_success
         results_dict[holdout_amt]['adj_r2_median'] = statistics.median(all_adj_r2)
+        results_dict[holdout_amt]['adj_r2_average'] = statistics.mean(all_adj_r2)
         results_dict[holdout_amt]['adj_r2_success'] = adj_r2_success
         results_dict[holdout_amt]['summed_success'] = abs_r2_success + adj_r2_success
+    
     return results_dict
 
 def evaluate_test_split_size(pickle_file_folder,
@@ -705,6 +728,213 @@ def calix_heatmap_from_csv(csv_folder,
     plt.close()
     return
 
+def scatter_by_network_class(pickle_file_folder,
+                             pickle_file_dict,
+                             calix_plot_setting,
+                             output_name,
+                             plot_mode='abs',
+                             save_png=False):
+    """
+    Script to make predicted vs actual plots segregated by calixarene type and network.
+
+    Further segregated into 'absolute' and 'relative' predictions - same definitions as elsewhere
+
+    Only for LOO results. Dataset split trials only considered A/E/P calixarenes - we want to examine B/C/D here as well
+    """
+
+    # Load the results from the files
+    results_dict = {}
+    
+    for specific_file in pickle_file_dict:
+        results_dict[specific_file] = {}
+        results_dict[specific_file]['pred'] = {}
+        results_dict[specific_file]['pred']['predicted'] = []
+        results_dict[specific_file]['pred']['actual'] = []
+        results_dict[specific_file]['unpred'] = {}
+        results_dict[specific_file]['unpred']['predicted'] = []
+        results_dict[specific_file]['unpred']['actual'] = []
+
+        curr_dict = load_result_dict(pickle_file_folder,
+                                     pickle_file_dict[specific_file])
+        # Need to gather points as intermediate lists, so that when output mode = 'rel', we adjust
+        # the predicted/actual numbers by the mean error
+
+        for curr_calix in curr_dict:
+            curr_pred_list = []
+            curr_act_list = []
+            curr_results = curr_dict[curr_calix]
+            if curr_calix[0] in ['A', 'E', 'P']:
+                for curr_peptide in curr_results:    
+                    curr_pred = curr_results[curr_peptide]['predicted']
+                    curr_act = curr_results[curr_peptide]['actual']
+                    if type(curr_pred) == list:
+                        curr_pred = curr_pred[0]
+                    if type(curr_act) == list:
+                        curr_act = curr_act[0]
+                    curr_pred_list.append(curr_pred)
+                    curr_act_list.append(curr_act)
+                if plot_mode == 'abs':
+                    results_dict[specific_file]['pred']['predicted'].extend(curr_pred_list)
+                    results_dict[specific_file]['pred']['actual'].extend(curr_act_list)
+                else:
+                    mean_adj_list = [a - b for a, b in zip(curr_act_list, curr_pred_list)]
+                    systematic_error = statistics.mean(mean_adj_list)
+                    adjusted_pred_values = [a + systematic_error for a in curr_pred_list]
+                    results_dict[specific_file]['pred']['predicted'].extend(adjusted_pred_values)
+                    results_dict[specific_file]['pred']['actual'].extend(curr_act_list)
+
+            else:
+                for curr_peptide in curr_results:    
+                    curr_pred = curr_results[curr_peptide]['predicted']
+                    curr_act = curr_results[curr_peptide]['actual']
+                    if type(curr_pred) == list:
+                        curr_pred = curr_pred[0]
+                    if type(curr_act) == list:
+                        curr_act = curr_act[0]
+                    curr_pred_list.append(curr_pred)
+                    curr_act_list.append(curr_act)
+                if plot_mode == 'abs':
+                    results_dict[specific_file]['unpred']['predicted'].extend(curr_pred_list)
+                    results_dict[specific_file]['unpred']['actual'].extend(curr_act_list)
+                else:
+                    mean_adj_list = [a - b for a, b in zip(curr_act_list, curr_pred_list)]
+                    systematic_error = statistics.mean(mean_adj_list)
+                    adjusted_pred_values = [a + systematic_error for a in curr_pred_list]
+                    results_dict[specific_file]['unpred']['predicted'].extend(adjusted_pred_values)
+                    results_dict[specific_file]['unpred']['actual'].extend(curr_act_list)
+
+    # Set up the figure
+    plt.figure(figsize=(calix_plot_setting['fig_width'], calix_plot_setting['fig_height']))
+    plt.xlabel(calix_plot_setting['x_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.ylabel(calix_plot_setting['y_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.xticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.yticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.title(calix_plot_setting['title'], fontsize=calix_plot_setting['title_font_size'])
+
+    # Create the scatter plot, with different colors for 'predictable' and 'unpredictable', and
+    # different shapes for the different files included (the names will be the dictionary keys)
+
+    for specific_file in results_dict:
+        predictable_pred_val = results_dict[specific_file]['pred']['predicted']
+        predictable_act_val = results_dict[specific_file]['pred']['actual']
+        unpredictable_pred_val = results_dict[specific_file]['unpred']['predicted']
+        unpredictable_act_val = results_dict[specific_file]['unpred']['actual']
+        # Extract the plot settings from calix_plot_setting
+        shape = calix_plot_setting['scatter_shape'][specific_file]
+        pred_color = calix_plot_setting['scatter_color']['predictable']
+        unpred_color = calix_plot_setting['scatter_color']['unpredictable']
+        size = calix_plot_setting['scatter_size']
+        opacity = calix_plot_setting['scatter_opacity']
+        # Plot the predictable points
+        plt.scatter(predictable_pred_val,
+                    predictable_act_val,
+                    color=pred_color,
+                    s=size,
+                    alpha=opacity,
+                    marker=shape,
+                    label=specific_file + ' predictable')
+        # Plot the unpredictable points
+        plt.scatter(unpredictable_pred_val,
+                    unpredictable_act_val,
+                    color=unpred_color,
+                    s=size,
+                    alpha=opacity,
+                    marker=shape,
+                    label=specific_file + ' unpredictable')
+
+    # Set the x and y axis to equal max/min to enforce a square plot,
+    # and add a diagonal line and the legent in the top right
+
+    # Read current max/min
+    x_min, x_max = plt.xlim()
+    y_min, y_max = plt.ylim()
+
+    # Set the limits to be equal at the max value
+    max_val = max(x_max, y_max)
+    min_val = min(x_min, y_min)
+    plt.xlim(min_val, max_val)
+    plt.ylim(min_val, max_val)
+    plt.plot([min_val, max_val], [min_val, max_val], color='black', linestyle='--', linewidth=1)
+    plt.legend(title='Network Class', loc='upper left', fontsize=calix_plot_setting['tick_font_size'])
+    
+    plt.show()
+    if save_png:
+        plt.savefig(output_name,
+                    dpi=300,
+                    facecolor="white",
+                    bbox_inches='tight',
+                    pad_inches=0.05,
+                    format='png')
+    plt.close()
+
+    return
+
+calix_plot_setting = {'fig_width': 8,
+                        'fig_height': 8,
+                        'x_label': 'Predicted',
+                        'y_label': 'Actual',
+                        'axis_font_size': 16,
+                        'tick_font_size': 14,
+                        'title_font_size': 18,
+                        'title': 'Calixarene Scatter Plot',
+                        'scatter_color': {'predictable': '#1f77b4', 
+                                        'unpredictable': '#ff7f0e'},
+                        'scatter_shape': {'CNN Absolute': 'o',
+                                        'CNN Relative': '^'},
+                        'scatter_size': 50,
+                        'scatter_opacity': 0.7}
+
+pickle_file_dict = {'CNN Absolute': 'LOO CNN Abs Train.pkl',
+                    'CNN Relative': 'High DO Rel LOO.pkl'}
+
+rf_abs_dict = {'0.05': '20 split 0.05 HO RF absolute.pkl',
+               '0.1': '20 split 0.1 HO RF absolute.pkl',
+               '0.15': '20 split 0.15 HO RF absolute.pkl',
+               '0.25': '20 split 0.25 HO RF absolute.pkl',
+               '0.5': '20 split 0.5 HO RF absolute.pkl',
+               '0.75': '20 split 0.75 HO RF absolute.pkl'}
+
+rf_rel_dict = {'0.05': '20 split 0.05 HO RF relative.pkl',
+                '0.1': '20 split 0.1 HO RF relative.pkl',
+                '0.15': '20 split 0.15 HO RF relative.pkl',
+                '0.25': '20 split 0.25 HO RF relative.pkl',
+                '0.5': '20 split 0.5 HO RF relative.pkl',
+                '0.75': '20 split 0.75 HO RF relative.pkl'}
+
+svm_abs_dict = {'0.05': '20 split 0.05 HO SVM absolute.pkl',
+                '0.1': '20 split 0.1 HO SVM absolute.pkl',
+                '0.15': '20 split 0.15 HO SVM absolute.pkl',
+                '0.25': '20 split 0.25 HO SVM absolute.pkl',
+                '0.5': '20 split 0.5 HO SVM absolute.pkl',
+                '0.75': '20 split 0.75 HO SVM absolute.pkl'}
+
+svm_rel_dict = {'0.05': '20 split 0.05 HO SVM relative.pkl',
+                '0.1': '20 split 0.1 HO SVM relative.pkl',
+                '0.15': '20 split 0.15 HO SVM relative.pkl',
+                '0.25': '20 split 0.25 HO SVM relative.pkl',
+                '0.5': '20 split 0.5 HO SVM relative.pkl',
+                '0.75': '20 split 0.75 HO SVM relative.pkl'}
+
+svm_abs_dict = {'0.05': '20 split 0.05 HO SVM absolute.pkl',
+                '0.1': '20 split 0.1 HO SVM absolute.pkl',
+                '0.15': '20 split 0.15 HO SVM absolute.pkl',
+                '0.25': '20 split 0.25 HO SVM absolute.pkl',
+                '0.5': '20 split 0.5 HO SVM absolute.pkl',
+                '0.75': '20 split 0.75 HO SVM absolute.pkl'}
+
+cnn_rel_dict = {'0.05': '20 split 0.05 HO CNN relative.pkl',
+                '0.1': '20 split 0.1 HO CNN relative.pkl',
+                '0.15': '20 split 0.15 HO CNN relative.pkl',
+                '0.25': '20 split 0.25 HO CNN relative.pkl',
+                '0.5': '20 split 0.5 HO CNN relative.pkl',
+                '0.75': '20 split 0.75 HO CNN relative.pkl'}
+
+cnn_abs_dict = {'0.05': '20 split 0.05 HO CNN absolute.pkl',
+                '0.1': '20 split 0.1 HO CNN absolute.pkl',
+                '0.15': '20 split 0.15 HO CNN absolute.pkl',
+                '0.25': '20 split 0.25 HO CNN absolute.pkl',
+                '0.5': '20 split 0.5 HO CNN absolute.pkl',
+                '0.75': '20 split 0.75 HO CNN absolute.pkl'}
 
 
         
