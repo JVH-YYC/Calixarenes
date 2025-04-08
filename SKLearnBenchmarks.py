@@ -500,6 +500,7 @@ def loo_svm_final(calixarene_csv_folder,
 
     # Loop through each calixarene
     for calix in calixarene_list:
+        print('Processing calix:', calix)
         # Create the dataset
         if relative_training:
             svi, peptide_name_list = create_LOO_relative_datasets(calixarene_csv_folder=calixarene_csv_folder,
@@ -845,14 +846,75 @@ split_calix_dict = {'predictable': ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
 #                         min_samples_leaf=4,
 #                         bootstrap=True)
 
-calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
-                   'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
-                   'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
-                   'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
-                   'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
-                   'CP2', 'DP2', 'DM1', 'DO2',  'DO3',
-                   'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
-                   'P-NO2', 'PSC4']
+# calixarene_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
+#                    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+#                    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+#                    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+#                    'BP0', 'BP1', 'BH2', 'BM1', 'CP1',
+#                    'CP2', 'DP2', 'DM1', 'DO2',  'DO3',
+#                    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+#                    'P-NO2', 'PSC4']
+
+# only_pred_calix_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6',
+#                    'AP7', 'AP8', 'AP9', 'AH1', 'AH2',
+#                    'AH3', 'AH4', 'AH5', 'AH6', 'AH7',
+#                    'AM1', 'AM2', 'AO1', 'AO2', 'AO3',
+#                    'E1', 'E3', 'E6', 'E7', 'E8', 'E11',
+#                    'P-NO2', 'PSC4']
+
+# Final test on curated dataset, both fingerprint models rel and absolute
+
+# loo_random_forest_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+#                         calixarene_csv_name='calix smiles small set.csv',
+#                         peptide_one_hot_encoding='one_hot_short.csv',
+#                         calixarene_list=only_pred_calix_list,
+#                         output_name='RF LOO small set absolute.pkl',
+#                         relative_training=False,
+#                         method='concat',
+#                         n_estimators=100,
+#                         max_depth=10,
+#                         min_samples_split=2,
+#                         min_samples_leaf=4,
+#                         bootstrap=True)
+
+# loo_random_forest_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+#                         calixarene_csv_name='calix smiles small set.csv',
+#                         peptide_one_hot_encoding='one_hot_short.csv',
+#                         calixarene_list=only_pred_calix_list,
+#                         output_name='RF LOO small set relative.pkl',
+#                         relative_training=True,
+#                         method='concat',
+#                         n_estimators=100,
+#                         max_depth=10,
+#                         min_samples_split=2,
+#                         min_samples_leaf=4,
+#                         bootstrap=True)
+
+# loo_svm_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+#                         calixarene_csv_name='calix smiles small set.csv',
+#                         peptide_one_hot_encoding='one_hot_short.csv',
+#                         calixarene_list=only_pred_calix_list,
+#                         output_name='SVM LOO small set absolute.pkl',
+#                         relative_training=False,
+#                         method='concat',
+#                         C=100,
+#                         kernel='rbf',
+#                         gamma='scale',
+#                         epsilon=0.1)
+
+# loo_svm_final(calixarene_csv_folder='/home/jvh/Documents/GitHub/Calixarenes/Featurization/',
+#                         calixarene_csv_name='calix smiles small set.csv',
+#                         peptide_one_hot_encoding='one_hot_short.csv',
+#                         calixarene_list=only_pred_calix_list,
+#                         output_name='SVM LOO small set relative.pkl',
+#                         relative_training=True,
+#                         method='concat',
+#                         C=100,
+#                         kernel='rbf',
+#                         gamma='scale',
+#                         epsilon=0.1)
+
+
 
 # rfi = create_single_split_ECFP_dataset('Featurization/',
 #                                        'calix smiles absolute.csv',
