@@ -273,6 +273,8 @@ def simple_calc_metrics_for_LOO(organized_dict):
     """
     Assumes a simple results dictionary (as from SKLearnBenchmarks LOO)
     Loops through individual calixarenes and prints R2 and adj R2
+
+    CNN saves as single-item lists, so need to extract the value from the list
     """
 
     for entry in organized_dict:
@@ -281,8 +283,12 @@ def simple_calc_metrics_for_LOO(organized_dict):
         curr_pred = []
         curr_act = []
         for peptide in curr_results:
-            curr_pred.append(curr_results[peptide]['predicted'])
-            curr_act.append(curr_results[peptide]['actual'])
+            if type(curr_results[peptide]['predicted']) == list:
+                curr_pred.append(curr_results[peptide]['predicted'][0])
+                curr_act.append(curr_results[peptide]['actual'][0])
+            else:
+                curr_pred.append(curr_results[peptide]['predicted'])
+                curr_act.append(curr_results[peptide]['actual'])
         mse, r2, adj_r2, shift_amount = calculate_metrics(curr_pred, curr_act)
         print('R2:', r2)
         print('Adj R2:', adj_r2)
