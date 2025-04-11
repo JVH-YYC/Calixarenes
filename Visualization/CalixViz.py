@@ -745,6 +745,8 @@ def scatter_by_network_class(pickle_file_folder,
 
     Further segregated into 'absolute' and 'relative' predictions - same definitions as elsewhere
 
+    Network type determines point color; 'predictable' vs 'unpredictable determines' point type
+
     Only for LOO results. Dataset split trials only considered A/E/P calixarenes - we want to examine B/C/D here as well
     """
 
@@ -826,27 +828,27 @@ def scatter_by_network_class(pickle_file_folder,
         unpredictable_pred_val = results_dict[specific_file]['unpred']['predicted']
         unpredictable_act_val = results_dict[specific_file]['unpred']['actual']
         # Extract the plot settings from calix_plot_setting
-        shape = calix_plot_setting['scatter_shape'][specific_file]
-        pred_color = calix_plot_setting['scatter_color']['predictable']
-        unpred_color = calix_plot_setting['scatter_color']['unpredictable']
+        color = calix_plot_setting['scatter_color'][specific_file]
+        pred_shape = calix_plot_setting['scatter_shape']['Predictable']
+        unpred_shape = calix_plot_setting['scatter_shape']['Unpredictable']
         size = calix_plot_setting['scatter_size']
         opacity = calix_plot_setting['scatter_opacity']
         # Plot the predictable points
         plt.scatter(predictable_pred_val,
                     predictable_act_val,
-                    color=pred_color,
+                    color=color,
                     s=size,
                     alpha=opacity,
-                    marker=shape,
-                    label=specific_file + ' predictable')
+                    marker=pred_shape,
+                    label=specific_file + ' Predictable')
         # Plot the unpredictable points
         plt.scatter(unpredictable_pred_val,
                     unpredictable_act_val,
-                    color=unpred_color,
+                    color=color,
                     s=size,
                     alpha=opacity,
-                    marker=shape,
-                    label=specific_file + ' unpredictable')
+                    marker=unpred_shape,
+                    label=specific_file + ' Unpredictable')
 
     # Set the x and y axis to equal max/min to enforce a square plot,
     # and add a diagonal line and the legent in the top right
@@ -855,23 +857,41 @@ def scatter_by_network_class(pickle_file_folder,
     x_min, x_max = plt.xlim()
     y_min, y_max = plt.ylim()
 
-    # Set the limits to be equal at the max value
+    # Set the limits to be equal at the max value. Print/output legend separately so it can be combined in Illustrator
     max_val = max(x_max, y_max)
     min_val = min(x_min, y_min)
     plt.xlim(min_val, max_val)
     plt.ylim(min_val, max_val)
     plt.plot([min_val, max_val], [min_val, max_val], color='black', linestyle='--', linewidth=1)
-    plt.legend(title='Network Class', loc='upper left', fontsize=calix_plot_setting['tick_font_size'])
     
-    plt.show()
+    # Get current legend info from main plot
+    handles, labels = plt.gca().get_legend_handles_labels()
+
     if save_png:
-        plt.savefig(output_name,
+        plt.savefig(output_name + '.svg',
                     dpi=300,
                     facecolor="white",
                     bbox_inches='tight',
                     pad_inches=0.05,
-                    format='png')
-    plt.close()
+                    format='svg')
+
+    plt.show()
+
+    # Create empty figure just for legend
+    fig_legend = plt.figure(figsize=(2, 1))  # tweak size as needed
+
+    fig_legend.legend(handles=handles,
+                    labels=labels,
+                    loc='center',
+                    frameon=False,  # No box around legend
+                    fontsize=calix_plot_setting['legend_font_size'])  # Optional: use your setting
+
+    fig_legend.gca().axis('off')
+
+    if save_png:
+        fig_legend.savefig(output_name + 'legend_only.svg',
+                        bbox_inches='tight',
+                        transparent=True)
 
     return
 
@@ -882,16 +902,17 @@ calix_plot_setting = {'fig_width': 8,
                         'axis_font_size': 16,
                         'tick_font_size': 14,
                         'title_font_size': 18,
-                        'title': 'Calixarene Scatter Plot',
-                        'scatter_color': {'predictable': '#1f77b4', 
-                                        'unpredictable': '#ff7f0e'},
-                        'scatter_shape': {'CNN Absolute': 'o',
-                                        'CNN Relative': '^'},
+                        'legend_font_size': 14,
+                        'title': 'CNN',
+                        'scatter_color': {'Absolute': (0.055, 0.297, 0.344), 
+                                        'Relative': (0.727, 0.285, 0.152)},
+                        'scatter_shape': {'Predictable': 'o',
+                                        'Unpredictable': 'x'},
                         'scatter_size': 50,
                         'scatter_opacity': 0.7}
 
-pickle_file_dict = {'CNN Absolute': 'LOO CNN Abs Train.pkl',
-                    'CNN Relative': 'High DO Rel LOO.pkl'}
+pickle_file_dict = {'Absolute': 'LOO CNN Abs Train.pkl',
+                    'Relative': 'High DO Rel LOO.pkl'}
 
 rf_abs_dict = {'0.05': '20 split 0.05 HO RF absolute.pkl',
                '0.1': '20 split 0.1 HO RF absolute.pkl',
