@@ -823,6 +823,7 @@ def scatter_by_network_class(pickle_file_folder,
     # different shapes for the different files included (the names will be the dictionary keys)
 
     for specific_file in results_dict:
+        print('Processing:', specific_file)
         predictable_pred_val = results_dict[specific_file]['pred']['predicted']
         predictable_act_val = results_dict[specific_file]['pred']['actual']
         unpredictable_pred_val = results_dict[specific_file]['unpred']['predicted']
@@ -841,6 +842,7 @@ def scatter_by_network_class(pickle_file_folder,
                     alpha=opacity,
                     marker=pred_shape,
                     label=specific_file + ' Predictable')
+        print('R2 value for "predictable" points is:', str(r2_score(predictable_act_val, predictable_pred_val)))
         # Plot the unpredictable points
         plt.scatter(unpredictable_pred_val,
                     unpredictable_act_val,
@@ -849,6 +851,7 @@ def scatter_by_network_class(pickle_file_folder,
                     alpha=opacity,
                     marker=unpred_shape,
                     label=specific_file + ' Unpredictable')
+        print('R2 value for "unpredictable" points is:', str(r2_score(unpredictable_act_val, unpredictable_pred_val)))
 
     # Set the x and y axis to equal max/min to enforce a square plot,
     # and add a diagonal line and the legent in the top right
@@ -905,14 +908,16 @@ calix_plot_setting = {'fig_width': 8,
                         'legend_font_size': 14,
                         'title': 'CNN',
                         'scatter_color': {'Absolute': (0.055, 0.297, 0.344), 
-                                        'Relative': (0.727, 0.285, 0.152)},
+                                        'Relative': (0.727, 0.285, 0.152),
+                                        'RF': (0.055, 0.297, 0.344),
+                                        'AFP': (0.727, 0.285, 0.152)},
                         'scatter_shape': {'Predictable': 'o',
                                         'Unpredictable': 'x'},
                         'scatter_size': 50,
                         'scatter_opacity': 0.7}
 
-pickle_file_dict = {'Absolute': 'LOO CNN Abs Train.pkl',
-                    'Relative': 'High DO Rel LOO.pkl'}
+pickle_file_dict = {'Absolute': 'AttentiveFP_regression.pkl',
+                    'Relative': 'Relative_FP.pkl'}
 
 rf_abs_dict = {'0.05': '20 split 0.05 HO RF absolute.pkl',
                '0.1': '20 split 0.1 HO RF absolute.pkl',
