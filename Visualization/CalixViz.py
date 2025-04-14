@@ -295,6 +295,31 @@ def simple_calc_metrics_for_LOO(organized_dict):
 
     return
 
+def overall_r2_from_dict(organized_dict):
+    """
+    Simple function that calculates the overall R2 and adj R2 from a dictionary of results.
+    Unlike all other function *no* split between any calixarene types
+    """
+
+    all_pred = []
+    all_act = []
+    for entry in organized_dict:
+        curr_results = organized_dict[entry]
+        curr_pred = []
+        curr_act = []
+        for peptide in curr_results:
+            if type(curr_results[peptide]['predicted']) == list:
+                curr_pred.append(curr_results[peptide]['predicted'][0])
+                curr_act.append(curr_results[peptide]['actual'][0])
+            else:
+                curr_pred.append(curr_results[peptide]['predicted'])
+                curr_act.append(curr_results[peptide]['actual'])
+        all_pred.extend(curr_pred)
+        all_act.extend(curr_act)
+
+    mse, r2, adj_r2, shift_amount = calculate_metrics(all_pred, all_act)
+    return r2, adj_r2
+
 def calculate_bothr2_by_holdout(result_folder,
                                 dict_of_holdout_amounts):
     """
@@ -898,6 +923,143 @@ def scatter_by_network_class(pickle_file_folder,
 
     return
 
+def highlight_individual_scatter(pickle_file_folder,
+                                 pickle_file_name,
+                                 highlight_calix,
+                                 calix_plot_setting,
+                                 output_name,
+                                 rectify_dict=False,
+                                 plot_mode='abs',
+                                 save_png=False):
+    """
+    Script to make a scatter plot where a small number of specific calixarenes are emphasized against the backdrop of
+    all other calixarenes.
+
+    Only does so for 1 network - so no pickle_file_dict, just a list of calix.
+    """
+    # AttentiveFP and GCN have slightly different pickled dictionary structures - in these cases, use
+    # 'rectify_dict == True to call function to convert to standard dictionary structure.
+
+    # Load the results from the files
+    results_dict = {}
+    results_dict['All Others'] = {}
+    results_dict['All Others']['predicted'] = []
+    results_dict['All Others']['actual'] = []
+
+    for highlight in highlight_calix:
+        results_dict[highlight] = {}
+        results_dict[highlight]['predicted'] = []
+        results_dict[highlight]['actual'] = []
+
+    open_result_dict = load_result_dict(pickle_file_folder,
+                                        pickle_file_name)
+    print('Set up All Others dict:')
+    print(results_dict['All Others'])
+
+    for curr_calix in open_result_dict:
+        print('Every loop check. AO Dict')
+        print(results_dict['All Others'])
+        curr_pred_list = []
+        curr_act_list = []
+        curr_results = open_result_dict[curr_calix]
+
+        for curr_peptide in curr_results:    
+            curr_pred = curr_results[curr_peptide]['predicted']
+            curr_act = curr_results[curr_peptide]['actual']
+            if type(curr_pred) == list:
+                curr_pred = curr_pred[0]
+            if type(curr_act) == list:
+                curr_act = curr_act[0]
+            curr_pred_list.append(curr_pred)
+            curr_act_list.append(curr_act)
+        if plot_mode == 'abs':
+            update_pred_list = curr_pred_list
+        else:
+            mean_adj_list = [a - b for a, b in zip(curr_act_list, curr_pred_list)]
+            systematic_error = statistics.mean(mean_adj_list)
+            update_pred_list = [a + systematic_error for a in curr_pred_list]
+
+        if curr_calix in highlight_calix:
+            results_dict[curr_calix]['predicted'].extend(update_pred_list)
+            results_dict[curr_calix]['actual'].extend(curr_act_list)
+        else:
+            results_dict['All Others']['predicted'].extend(update_pred_list)
+            results_dict['All Others']['actual'].extend(curr_act_list)
+
+    # Set up the figure
+    plt.figure(figsize=(calix_plot_setting['fig_width'], calix_plot_setting['fig_height']))
+    plt.xlabel(calix_plot_setting['x_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.ylabel(calix_plot_setting['y_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.xticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.yticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.title(calix_plot_setting['title'], fontsize=calix_plot_setting['title_font_size'])
+
+    # Create the scatter plot, with different colors for each highlight and "All Others"
+    
+
+    for calix in results_dict:
+        current_pred_val = results_dict[calix]['predicted']
+        current_act_val = results_dict[calix]['actual']
+
+        # Extract the plot settings from calix_plot_setting
+        color = calix_plot_setting['scatter_color'][calix]
+        shape = calix_plot_setting['scatter_shape'][calix]
+        size = calix_plot_setting['scatter_size']
+        opacity = calix_plot_setting['scatter_opacity'][calix]
+        # Plot the current points
+        plt.scatter(current_pred_val,
+                    current_act_val,
+                    color=color,
+                    s=size,
+                    alpha=opacity,
+                    marker=shape,
+                    label=calix)
+        
+    # Set the x and y axis to equal max/min to enforce a square plot,
+    # and add a diagonal line and the legent in the top right
+
+    # Read current max/min
+    x_min, x_max = plt.xlim()
+    y_min, y_max = plt.ylim()
+
+    # Set the limits to be equal at the max value. Print/output legend separately so it can be combined in Illustrator
+    max_val = max(x_max, y_max)
+    min_val = min(x_min, y_min)
+    plt.xlim(min_val, max_val)
+    plt.ylim(min_val, max_val)
+    plt.plot([min_val, max_val], [min_val, max_val], color='black', linestyle='--', linewidth=1)
+    
+    # Get current legend info from main plot
+    handles, labels = plt.gca().get_legend_handles_labels()
+
+    if save_png:
+        plt.savefig(output_name + '.svg',
+                    dpi=300,
+                    facecolor="white",
+                    bbox_inches='tight',
+                    pad_inches=0.05,
+                    format='svg')
+
+    plt.show()
+
+    # Create empty figure just for legend
+    fig_legend = plt.figure(figsize=(2, 1))  # tweak size as needed
+
+    fig_legend.legend(handles=handles,
+                    labels=labels,
+                    loc='center',
+                    frameon=False,  # No box around legend
+                    fontsize=calix_plot_setting['legend_font_size'])  # Optional: use your setting
+
+    fig_legend.gca().axis('off')
+
+    if save_png:
+        fig_legend.savefig(output_name + 'legend_only.svg',
+                        bbox_inches='tight',
+                        transparent=True)
+
+    return
+    
 calix_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
                         'x_label': 'Predicted',
@@ -916,6 +1078,30 @@ calix_plot_setting = {'fig_width': 8,
                         'scatter_size': 50,
                         'scatter_opacity': 0.7}
 
+highlight_plot_setting = {'fig_width': 8,
+                        'fig_height': 8,
+                        'x_label': 'Predicted',
+                        'y_label': 'Actual',
+                        'axis_font_size': 16,
+                        'tick_font_size': 14,
+                        'title_font_size': 18,
+                        'legend_font_size': 14,
+                        'title': 'CNN',
+                        'scatter_color': {'AP1': (0.727, 0.285, 0.152), 
+                                        'AH6': (0.000, 0.578, 0.266),
+                                        'CP2': (0.398, 0.176, 0.566),
+                                        'All Others': (0.055, 0.297, 0.344)},
+                        'scatter_shape': {'AP1': 'o',
+                                          'AH6': 'o',
+                                          'CP2': 'o',
+                                          'All Others': 'o'},
+                        'scatter_size': 50,
+                        'scatter_opacity': {'AP1': 0.95,
+                                            'AH6': 0.95,
+                                            'CP2': 0.95,
+                                            'All Others': 0.1}}
+
+highlight_calix_list = ['AP1', 'AH6', 'CP2']
 pickle_file_dict = {'Absolute': 'AttentiveFP_regression.pkl',
                     'Relative': 'Relative_FP.pkl'}
 
