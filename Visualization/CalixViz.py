@@ -848,36 +848,40 @@ def scatter_by_network_class(pickle_file_folder,
     # different shapes for the different files included (the names will be the dictionary keys)
 
     for specific_file in results_dict:
-        print('Processing:', specific_file)
         predictable_pred_val = results_dict[specific_file]['pred']['predicted']
         predictable_act_val = results_dict[specific_file]['pred']['actual']
         unpredictable_pred_val = results_dict[specific_file]['unpred']['predicted']
         unpredictable_act_val = results_dict[specific_file]['unpred']['actual']
         # Extract the plot settings from calix_plot_setting
-        color = calix_plot_setting['scatter_color'][specific_file]
-        pred_shape = calix_plot_setting['scatter_shape']['Predictable']
-        unpred_shape = calix_plot_setting['scatter_shape']['Unpredictable']
+        pred_color = calix_plot_setting['scatter_color'][specific_file]['Predictable']
+        pred_shape = calix_plot_setting['scatter_shape'][specific_file]['Predictable']
+        unpred_color = calix_plot_setting['scatter_color'][specific_file]['Unpredictable']
+        unpred_shape = calix_plot_setting['scatter_shape'][specific_file]['Unpredictable']
         size = calix_plot_setting['scatter_size']
         opacity = calix_plot_setting['scatter_opacity']
         # Plot the predictable points
         plt.scatter(predictable_pred_val,
                     predictable_act_val,
-                    color=color,
+                    color=pred_color,
                     s=size,
                     alpha=opacity,
                     marker=pred_shape,
                     label=specific_file + ' Predictable')
-        print('R2 value for "predictable" points is:', str(r2_score(predictable_act_val, predictable_pred_val)))
-        # Plot the unpredictable points
-        plt.scatter(unpredictable_pred_val,
-                    unpredictable_act_val,
-                    color=color,
-                    s=size,
-                    alpha=opacity,
-                    marker=unpred_shape,
-                    label=specific_file + ' Unpredictable')
-        print('R2 value for "unpredictable" points is:', str(r2_score(unpredictable_act_val, unpredictable_pred_val)))
-
+        # Try unpredicable; sometimes must be skipped for filtered datasets
+        try:
+            print('R2 value for "predictable" points is:', str(r2_score(predictable_act_val, predictable_pred_val)))
+            # Plot the unpredictable points
+            plt.scatter(unpredictable_pred_val,
+                        unpredictable_act_val,
+                        color=unpred_color,
+                        s=size,
+                        alpha=opacity,
+                        marker=unpred_shape,
+                        label=specific_file + ' Unpredictable')
+            print('R2 value for "unpredictable" points is:', str(r2_score(unpredictable_act_val, unpredictable_pred_val)))
+        except:
+            print('No unpredictable points for this dataset')
+            pass
     # Set the x and y axis to equal max/min to enforce a square plot,
     # and add a diagonal line and the legent in the top right
 
@@ -896,12 +900,12 @@ def scatter_by_network_class(pickle_file_folder,
     handles, labels = plt.gca().get_legend_handles_labels()
 
     if save_png:
-        plt.savefig(output_name + '.svg',
+        plt.savefig(output_name + '.png',
                     dpi=300,
                     facecolor="white",
                     bbox_inches='tight',
                     pad_inches=0.05,
-                    format='svg')
+                    format='png')
 
     plt.show()
 
@@ -917,7 +921,7 @@ def scatter_by_network_class(pickle_file_folder,
     fig_legend.gca().axis('off')
 
     if save_png:
-        fig_legend.savefig(output_name + 'legend_only.svg',
+        fig_legend.savefig(output_name + 'legend_only.png',
                         bbox_inches='tight',
                         transparent=True)
 
@@ -928,7 +932,6 @@ def highlight_individual_scatter(pickle_file_folder,
                                  highlight_calix,
                                  calix_plot_setting,
                                  output_name,
-                                 rectify_dict=False,
                                  plot_mode='abs',
                                  save_png=False):
     """
@@ -937,8 +940,6 @@ def highlight_individual_scatter(pickle_file_folder,
 
     Only does so for 1 network - so no pickle_file_dict, just a list of calix.
     """
-    # AttentiveFP and GCN have slightly different pickled dictionary structures - in these cases, use
-    # 'rectify_dict == True to call function to convert to standard dictionary structure.
 
     # Load the results from the files
     results_dict = {}
@@ -953,12 +954,8 @@ def highlight_individual_scatter(pickle_file_folder,
 
     open_result_dict = load_result_dict(pickle_file_folder,
                                         pickle_file_name)
-    print('Set up All Others dict:')
-    print(results_dict['All Others'])
 
     for curr_calix in open_result_dict:
-        print('Every loop check. AO Dict')
-        print(results_dict['All Others'])
         curr_pred_list = []
         curr_act_list = []
         curr_results = open_result_dict[curr_calix]
@@ -1062,46 +1059,72 @@ def highlight_individual_scatter(pickle_file_folder,
     
 calix_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
+                        'x_label': 'Predicted (relative)',
+                        'y_label': 'Actual (relative)',
+                        'axis_font_size': 32,
+                        'tick_font_size': 24,
+                        'title_font_size': 40,
+                        'legend_font_size': 32,
+                        'title': 'AttentiveFP',
+                        'scatter_color': {'AttentiveFP': {'Unpredictable': (0.055, 0.297, 0.344),
+                                                          'Predictable': (0.727, 0.285, 0.152)}},
+                        'scatter_shape': {'AttentiveFP': {'Predictable': 'o',
+                                                          'Unpredictable': 'x'}},
+                        'scatter_size': 75,
+                        'scatter_opacity': 0.5}
+
+lead_in_plot_setting = {'fig_width': 8,
+                        'fig_height': 8,
                         'x_label': 'Predicted',
                         'y_label': 'Actual',
-                        'axis_font_size': 16,
-                        'tick_font_size': 14,
-                        'title_font_size': 18,
-                        'legend_font_size': 14,
-                        'title': 'CNN',
-                        'scatter_color': {'Absolute': (0.055, 0.297, 0.344), 
-                                        'Relative': (0.727, 0.285, 0.152),
-                                        'RF': (0.055, 0.297, 0.344),
-                                        'AFP': (0.727, 0.285, 0.152)},
-                        'scatter_shape': {'Predictable': 'o',
-                                        'Unpredictable': 'x'},
-                        'scatter_size': 50,
-                        'scatter_opacity': 0.7}
+                        'axis_font_size': 32,
+                        'tick_font_size': 24,
+                        'title_font_size': 40,
+                        'legend_font_size': 32,
+                        'title': 'GCN',
+                        'scatter_color': {'AO3': (0.727, 0.285, 0.152), 
+                                        'AM1': (0.000, 0.578, 0.266),
+                                        'CP2': (0.398, 0.176, 0.566),
+                                        'All Others': (0.055, 0.297, 0.344)},
+                        'scatter_shape': {'AO3': 'o',
+                                          'AM1': 'o',
+                                          'CP2': 'o',
+                                          'All Others': 'o'},
+                        'scatter_size': 75,
+                        'scatter_opacity': {'AO3': 0.95,
+                                            'AM1': 0.95,
+                                            'CP2': 0.95,
+                                            'All Others': 0.5}}
+
+lead_in_calix_list = []
+
 
 highlight_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
                         'x_label': 'Predicted',
                         'y_label': 'Actual',
-                        'axis_font_size': 16,
-                        'tick_font_size': 14,
-                        'title_font_size': 18,
-                        'legend_font_size': 14,
-                        'title': 'CNN',
-                        'scatter_color': {'AP1': (0.727, 0.285, 0.152), 
-                                        'AH6': (0.000, 0.578, 0.266),
+                        'axis_font_size': 32,
+                        'tick_font_size': 24,
+                        'title_font_size': 40,
+                        'legend_font_size': 32,
+                        'title': 'GCN',
+                        'scatter_color': {'AO3': (0.727, 0.285, 0.152), 
+                                        'AM1': (0.000, 0.578, 0.266),
                                         'CP2': (0.398, 0.176, 0.566),
                                         'All Others': (0.055, 0.297, 0.344)},
-                        'scatter_shape': {'AP1': 'o',
-                                          'AH6': 'o',
+                        'scatter_shape': {'AO3': 'o',
+                                          'AM1': 'o',
                                           'CP2': 'o',
                                           'All Others': 'o'},
-                        'scatter_size': 50,
-                        'scatter_opacity': {'AP1': 0.95,
-                                            'AH6': 0.95,
+                        'scatter_size': 75,
+                        'scatter_opacity': {'AO3': 0.95,
+                                            'AM1': 0.95,
                                             'CP2': 0.95,
                                             'All Others': 0.1}}
 
-highlight_calix_list = ['AP1', 'AH6', 'CP2']
+highlight_calix_list = ['AO3', 'AM1', 'CP2']
+
+example_plot_dict = {'AttentiveFP': 'AttentiveFP_regression.pkl'}
 pickle_file_dict = {'Absolute': 'AttentiveFP_regression.pkl',
                     'Relative': 'Relative_FP.pkl'}
 
