@@ -26,6 +26,9 @@ import statistics
 import calix_visual_settings as CVS
 import matplotlib.patches as patches
 import pickle
+import copy
+import random
+import os
 
 from sklearn.metrics import roc_curve, auc, r2_score, mean_squared_error
 from scipy.stats import pearsonr
@@ -879,6 +882,9 @@ def scatter_by_network_class(pickle_file_folder,
                         marker=unpred_shape,
                         label=specific_file + ' Unpredictable')
             print('R2 value for "unpredictable" points is:', str(r2_score(unpredictable_act_val, unpredictable_pred_val)))
+            full_act_val = predictable_act_val + unpredictable_act_val
+            full_pred_val = predictable_pred_val + unpredictable_pred_val
+            print('R2 value for full set is:', str(r2_score(full_act_val, full_pred_val)))
         except:
             print('No unpredictable points for this dataset')
             pass
@@ -1056,7 +1062,310 @@ def highlight_individual_scatter(pickle_file_folder,
                         transparent=True)
 
     return
+
+def calculate_test_calix_distribution(pickle_file_folder,
+                                      network_name_list,
+                                      calixarene_name_list,
+                                      holdout_amount_list,
+                                      leading_string,
+                                      repeat_number):
+    """
+    A function that takes a folder full of different training/test splits, and looks at the distribution of
+    specific calixarenes in each trial. It will export a dictionary with the maximum and minimum number of times a calixarene
+    is observed in a given trial, and a True/False flag for whether any calixarene was never in test set
+    """
+
+    # Initialize the dictionary to hold the results
+    return_dict = {}
+    blank_dict = {}
+    for entry in calixarene_name_list:
+        return_dict[entry] = [100, 0, False] #[min, max, never in test set]
+        blank_dict[entry] = [0, False]
+    # Loop through the network names
+    for network_name in network_name_list:
+        for holdout_amount in holdout_amount_list:
+            file_name_abs = f"{leading_string} {holdout_amount} HO {network_name} absolute.pkl"
+            file_name_rel = f"{leading_string} {holdout_amount} HO {network_name} relative.pkl"
+            print('Loading files:', file_name_abs, file_name_rel)
+            # Load the absolute and relative files
+            abs_dict = load_result_dict(pickle_file_folder,
+                                        file_name_abs)
+            abs_dict = rectify_pno2_name(abs_dict)
+            rel_dict = load_result_dict(pickle_file_folder,
+                                        file_name_rel)
+            rel_dict = rectify_pno2_name(rel_dict)
+
+            # Create a working copy of the blank starting dict
+            abs_working_dict = copy.deepcopy(blank_dict)
+            rel_working_dict = copy.deepcopy(blank_dict)
+            # Loop through both dictionaries, which have identical keys
+            for repeat in abs_dict:
+                for calix in abs_dict[repeat]:
+                    abs_working_dict[calix][0] += 1
+                for calix in rel_dict[repeat]:
+                    rel_working_dict[calix][0] += 1
+
+            # Now check if any calixarene was never in the test set
+            for calix in abs_working_dict:
+                if abs_working_dict[calix][0] == 0:
+                    abs_working_dict[calix][1] = True
+            for calix in rel_working_dict:
+                if rel_working_dict[calix][0] == 0:
+                    rel_working_dict[calix][1] = True
+
+            # Update the return dictionary with the max value, and any 'True' flags
+            for calix in return_dict:
+                return_dict[calix][0] = min(return_dict[calix][0],
+                                            abs_working_dict[calix][0],
+                                            rel_working_dict[calix][0])
+                return_dict[calix][1] = max(return_dict[calix][1],
+                                            abs_working_dict[calix][0],
+                                            rel_working_dict[calix][0])
+                if abs_working_dict[calix][1] or rel_working_dict[calix][1] == True:
+                    return_dict[calix][2] = True
     
+    return return_dict
+
+def rectify_pno2_name(input_dict):
+    """
+    A trivial function that takes an input dictionary.
+    If 'P-NO2' is a key in the dictionary, it is replaced with
+    'PNO2', and the fixed dictionary is returned. Due to a typo between
+    different training .csv sheets
+
+    This mainly impacts the 20-repeat holdout dictionaries, so must
+    loop through repeat trials.
+
+    Also, some dicts use the string '0', versus the int 0. Rectify all to strings.
+    """
+
+    # Create a new dictionary to hold the fixed keys
+    fixed_dict = {}
+
+    # Iterate through the input dictionary
+    for repeat in input_dict:
+        for key, value in input_dict[repeat].items():
+            # Check if the key is 'P-NO2' and replace it with 'PNO2'
+            if key == 'P-NO2':
+                fixed_key = 'PNO2'
+            else:
+                fixed_key = key
+
+            # Add the value to the new dictionary with the fixed key
+            if str(repeat) not in fixed_dict:
+                fixed_dict[str(repeat)] = {}
+            fixed_dict[str(repeat)][fixed_key] = value
+
+    return fixed_dict
+
+def normalize_and_report_test_splits(pickle_file_folder,
+                                     network_name_list,
+                                     calixarene_name_list,
+                                     holdout_amount_list,
+                                     leading_string,
+                                     repeat_number,
+                                     output_name):
+    """
+    A function that takes many different test splits, for many different models. First, it calculates
+    overall distributions for the entire set.
+
+    Then, it begins to parse individual splits and networks, normalizing each example with the correct
+    number of repeats per calixarene.
+
+    Most calix have between 15-18 repeats, so multiple copies will be needed. In the case of odd numbers of
+    test examples, take the middle value. In the case of even, take the 2 closest to the middle, and repeat them
+    equal numbers of times (up until the final example for an odd set, which is randomly chosen.)
+
+    Adjusted R2 values need to be calculated for each calixarene - otherwise conflicting systematic errors will
+    cancel out, and the adjustment won't work
+
+    Exclude any calix that did not appear in a given model/split trial.
+    """
+
+    # Helper function for extracting the middle of a list
+    def middle_slice(lst, k):
+        """
+        Return a sublist of length k taken from the middle of lst.
+        If (len(lst) - k) is odd, randomly choose between the two center positions.
+        """
+        n = len(lst)
+        # if k >= n just return a shallow copy of the whole list
+        if k >= n:
+            return lst[:]
+
+        rem = n - k               # number to drop
+        base = rem // 2           # floor of the start index
+        offset = random.randint(0, rem % 2)
+        start = base + offset
+        return lst[start : start + k]
+    
+    # Helper function for adjusting pred/act values on the fly
+    def adjusted_r2_raw(pred_list, act_list):
+        """
+        Adjust predicted values by average error and return
+        """
+        mean_adj_list = [a - b for a, b in zip(act_list, pred_list)]
+
+        systematic_error = statistics.mean(mean_adj_list)
+
+        adjusted_pred_values = [a + systematic_error for a in pred_list]
+
+        return adjusted_pred_values
+      
+    # Calculate overall stats
+    stat_dict = calculate_test_calix_distribution(pickle_file_folder,
+                                                    network_name_list,
+                                                    calixarene_name_list,
+                                                    holdout_amount_list,
+                                                    leading_string,
+                                                    repeat_number)
+    # Create a dictionary for final reporting
+    report_dict = {}
+
+    # Loop through the network type, then holdout amount.
+    for network_name in network_name_list:
+        if network_name not in report_dict:
+            report_dict[network_name] = {}
+        for holdout_amount in holdout_amount_list:
+            if holdout_amount not in report_dict[network_name]:
+                report_dict[network_name][holdout_amount] = {}
+                report_dict[network_name][holdout_amount]['abs'] = {}
+                report_dict[network_name][holdout_amount]['rel'] = {}
+
+                # Load absolute and relative files
+                file_name_abs = f"{leading_string} {holdout_amount} HO {network_name} absolute.pkl"
+                file_name_rel = f"{leading_string} {holdout_amount} HO {network_name} relative.pkl"
+                abs_dict = load_result_dict(pickle_file_folder,
+                                            file_name_abs)
+                abs_dict = rectify_pno2_name(abs_dict)
+                rel_dict = load_result_dict(pickle_file_folder,
+                                            file_name_rel)
+                rel_dict = rectify_pno2_name(rel_dict)
+
+                # Process each calixarene
+                for calix in calixarene_name_list:
+                    if stat_dict[calix][2] == True:
+                        # If the calixarene was never in the test set, skip it
+                        continue
+                    rel_r2s = []
+                    abs_r2s = []
+                    for repeat in abs_dict:
+                        if calix in abs_dict[repeat]:
+                            # Get the predicted and actual values
+                            curr_pred = [x[0][0] if isinstance(x[0], list) else x[0] for x in abs_dict[repeat][calix]]
+                            curr_act = [x[1][0] if isinstance(x[1], list) else x[1] for x in abs_dict[repeat][calix]]
+
+                            # Calculate the R2 value
+                            r2_val = r2_score(curr_act, curr_pred)
+                            abs_r2s.append([r2_val, curr_act, curr_pred, adjusted_r2_raw(curr_pred, curr_act)])
+                        if calix in rel_dict[repeat]:
+                            # Get the predicted and actual values
+                            curr_pred = [x[0][0] if isinstance(x[0], list) else x[0] for x in rel_dict[repeat][calix]]
+                            curr_act = [x[1][0] if isinstance(x[1], list) else x[1] for x in rel_dict[repeat][calix]]
+
+                            # Calculate the R2 value
+                            r2_val = r2_score(curr_act, curr_pred)
+                            rel_r2s.append([r2_val, curr_act, curr_pred, adjusted_r2_raw(curr_pred, curr_act)])
+                    
+                    # Now, we need to normalize the R2 values by the number of repeats from the stat_dict
+                    abs_pred_list = []
+                    abs_adj_list = []
+                    abs_act_list = []
+                    rel_pred_list = []
+                    rel_act_list = []
+                    rel_adj_list = []
+
+                    # First, organize lists by R2 value
+                    abs_r2s.sort(key=lambda x: x[0], reverse=True)
+                    rel_r2s.sort(key=lambda x: x[0], reverse=True)
+                    # Get the number of necessary repeats for this calixarene and figure out how many times to repeat all entries
+                    num_obs = stat_dict[calix][1]
+                    abs_repeats = num_obs // len(abs_r2s)
+                    rel_repeats = num_obs // len(rel_r2s)
+                    abs_remainder = num_obs % len(abs_r2s)
+                    rel_remainder = num_obs % len(rel_r2s)
+                    abs_slice = middle_slice(abs_r2s, num_obs)
+                    rel_slice = middle_slice(rel_r2s, num_obs)
+
+                    # Fill the lists with the correct number of repeats
+                    for entry in abs_r2s:
+                        for repeat in range(abs_repeats):
+                            abs_pred_list.extend(entry[2])
+                            abs_act_list.extend(entry[1])
+                            abs_adj_list.extend(entry[3])
+                    for entry in rel_r2s:
+                        for repeat in range(rel_repeats):
+                            rel_pred_list.extend(entry[2])
+                            rel_act_list.extend(entry[1])
+                            rel_adj_list.extend(entry[3])
+
+                    # Add the remainder entries to the end of the list
+                    for entry in abs_slice:
+                        abs_pred_list.extend(entry[2])
+                        abs_act_list.extend(entry[1])
+                        abs_adj_list.extend(entry[3])
+                    for entry in rel_slice:
+                        rel_pred_list.extend(entry[2])
+                        rel_act_list.extend(entry[1])
+                        rel_adj_list.extend(entry[3])
+
+                    # Save to the return dictionary in separate pred/actual lists - easier for further processing
+                    report_dict[network_name][holdout_amount]['abs'][calix] = {}
+                    report_dict[network_name][holdout_amount]['abs'][calix]['predicted'] = abs_pred_list
+                    report_dict[network_name][holdout_amount]['abs'][calix]['actual'] = abs_act_list
+                    report_dict[network_name][holdout_amount]['abs'][calix]['adjusted'] = abs_adj_list
+                    report_dict[network_name][holdout_amount]['rel'][calix] = {}
+                    report_dict[network_name][holdout_amount]['rel'][calix]['predicted'] = rel_pred_list
+                    report_dict[network_name][holdout_amount]['rel'][calix]['actual'] = rel_act_list
+                    report_dict[network_name][holdout_amount]['rel'][calix]['adjusted'] = rel_adj_list
+
+    # Save the report dictionary to a pickle file
+    pickle_file_name = os.path.join(pickle_file_folder,
+                                    output_name + '.pkl')
+    with open(pickle_file_name, 'wb') as f:
+        pickle.dump(report_dict, f)
+
+    return report_dict
+                        
+def report_various_test_split_results(test_split_dict):
+    """"
+    Simple function that reads the dictionary generated directly above, and reports the R2 and adjusted R2 for
+    transfer to an Excel sheet and/or other reporting
+    """                                             
+
+    # Depends on standard dictionary structure
+    for network_type in test_split_dict:
+        print('For network type:', network_type)
+        for holdout_amount in test_split_dict[network_type]:
+            print('For holdout amount:', holdout_amount)
+            abs_predictable_pred = []
+            abs_predictable_act = []
+            abs_predictable_adj = []
+            rel_predictable_pred = []
+            rel_predictable_act = []
+            rel_predictable_adj = []
+
+            for calix in test_split_dict[network_type][holdout_amount]['abs']:
+                abs_predictable_pred.extend(test_split_dict[network_type][holdout_amount]['abs'][calix]['predicted'])
+                abs_predictable_act.extend(test_split_dict[network_type][holdout_amount]['abs'][calix]['actual'])
+                abs_predictable_adj.extend(test_split_dict[network_type][holdout_amount]['abs'][calix]['adjusted'])
+            for calix in test_split_dict[network_type][holdout_amount]['rel']:
+                rel_predictable_pred.extend(test_split_dict[network_type][holdout_amount]['rel'][calix]['predicted'])
+                rel_predictable_act.extend(test_split_dict[network_type][holdout_amount]['rel'][calix]['actual'])
+                rel_predictable_adj.extend(test_split_dict[network_type][holdout_amount]['rel'][calix]['adjusted'])
+
+            # Calculate the R2 values
+            abs_predictable_r2 = r2_score(abs_predictable_act, abs_predictable_pred)
+            abs_predictable_adj_r2 = r2_score(abs_predictable_act, abs_predictable_adj)
+            print('Absolute Predictable R2:', abs_predictable_r2)
+            print('Absolute Predictable Adjusted R2:', abs_predictable_adj_r2)
+            rel_predictable_r2 = r2_score(rel_predictable_act, rel_predictable_pred)
+            rel_predictable_adj_r2 = r2_score(rel_predictable_act, rel_predictable_adj)
+            print('Relative Predictable R2:', rel_predictable_r2)
+            print('Relative Predictable Adjusted R2:', rel_predictable_adj_r2)
+    
+    return
+
 calix_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
                         'x_label': 'Predicted (relative)',
@@ -1127,6 +1436,17 @@ highlight_calix_list = ['AO3', 'AM1', 'CP2']
 example_plot_dict = {'AttentiveFP': 'AttentiveFP_regression.pkl'}
 pickle_file_dict = {'Absolute': 'AttentiveFP_regression.pkl',
                     'Relative': 'Relative_FP.pkl'}
+
+full_calix_list = ['AP1', 'AP3', 'AP4', 'AP5', 'AP6', 'AP7', 'AP8',
+                   'AP9', 'AH1', 'AH2', 'AH3', 'AH4', 'AH5', 'AH6',
+                   'AH7', 'AM1', 'AM2', 'AO1', 'AO2', 'AO3', 'E1',
+                   'E3', 'E6', 'E7', 'E8', 'E11', 'PNO2', 'PSC4',
+                   'BP0', 'BP1', 'BH2', 'BM1', 'CP1', 'CP2', 'DP2',
+                   'DM1', 'DO2', 'DO3']
+
+network_name_list = ['RF', 'SVM', 'CNN', 'GCN', 'AFP']
+holdout_amount_list = [0.1, 0.15, 0.25, 0.5, 0.75]
+leading_string = '20 split'
 
 rf_abs_dict = {'0.05': '20 split 0.05 HO RF absolute.pkl',
                '0.1': '20 split 0.1 HO RF absolute.pkl',
