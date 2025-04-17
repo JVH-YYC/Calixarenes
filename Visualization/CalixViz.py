@@ -933,6 +933,127 @@ def scatter_by_network_class(pickle_file_folder,
 
     return
 
+def scatter_holdout_amount(pickle_file_folder,
+                           pickle_file_dict,
+                           calix_plot_setting,
+                           output_name,
+                           plot_mode='abs',
+                           save_png=False):
+    
+    """ 
+    A function very closely related to that directly above - with only 1 real difference.
+    This function interacts with the 20-repeat test split dictionaries, which have a different
+    dictionary organization, so the initial data wrangling is slightly different.
+    Plotting occurs in the same way once the data is rectified
+    """
+    # Helper function for adjusting pred/act values on the fly
+    def adjusted_r2_raw(pred_list, act_list):
+        """
+        Adjust predicted values by average error and return
+        """
+        mean_adj_list = [a - b for a, b in zip(act_list, pred_list)]
+
+        systematic_error = statistics.mean(mean_adj_list)
+
+        adjusted_pred_values = [a + systematic_error for a in pred_list]
+
+        return adjusted_pred_values
+    
+    # Compile into single result dict
+    results_dict = {}
+
+    for specific_file in pickle_file_dict:
+        results_dict[specific_file] = {}
+        results_dict[specific_file]['predicted'] = []
+        results_dict[specific_file]['actual'] = []
+        results_dict[specific_file]['adjusted'] = []
+
+        curr_dict = load_result_dict(pickle_file_folder,
+                                     pickle_file_dict[specific_file])
+        
+        for repeat in curr_dict:
+            for calix in curr_dict[repeat]:
+                curr_pred = [x[0][0] if isinstance(x[0], list) else x[0] for x in curr_dict[repeat][calix]]
+                curr_act = [x[1][0] if isinstance(x[1], list) else x[1] for x in curr_dict[repeat][calix]]
+                curr_adj = adjusted_r2_raw(curr_pred, curr_act)
+                
+                results_dict[specific_file]['predicted'].extend(curr_pred)
+                results_dict[specific_file]['actual'].extend(curr_act)
+                results_dict[specific_file]['adjusted'].extend(curr_adj)
+
+    # Set up the figure
+    plt.figure(figsize=(calix_plot_setting['fig_width'], calix_plot_setting['fig_height']))
+    plt.xlabel(calix_plot_setting['x_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.ylabel(calix_plot_setting['y_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.xticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.yticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.title(calix_plot_setting['title'], fontsize=calix_plot_setting['title_font_size'])
+
+    # Create the plot, which might be multiple network types, multiple holdout amounts, etc.
+    for specific_file in results_dict:
+        if plot_mode == 'abs':
+            current_pred_val = results_dict[specific_file]['predicted']
+            current_act_val = results_dict[specific_file]['actual']
+        else:
+            current_pred_val = results_dict[specific_file]['adjusted']
+            current_act_val = results_dict[specific_file]['actual']
+        # Extract the plot settings from calix_plot_setting
+        color = calix_plot_setting['scatter_color'][specific_file]
+        shape = calix_plot_setting['scatter_shape'][specific_file]
+        size = calix_plot_setting['scatter_size']
+        opacity = calix_plot_setting['scatter_opacity'][specific_file] # Different splits have different numbers of points
+        # Plot the current points
+        plt.scatter(current_pred_val,
+                    current_act_val,
+                    color=color,
+                    s=size,
+                    alpha=opacity,
+                    marker=shape,
+                    label=specific_file)
+    # Set the x and y axis to equal max/min to enforce a square plot,
+    # add a diagonal line. Plot legend separately so it can be combined in Illustrator
+
+    # Read current max/min
+    x_min, x_max = plt.xlim()
+    y_min, y_max = plt.ylim()
+    # Set the limits to be equal at the max value. Print/output legend separately so it can be combined in Illustrator
+    max_val = max(x_max, y_max)
+    min_val = min(x_min, y_min)
+    plt.xlim(min_val, max_val)
+    plt.ylim(min_val, max_val)
+    plt.plot([min_val, max_val], [min_val, max_val], color='black', linestyle='--', linewidth=1)
+
+    # Get current legend info from main plot
+    handles, labels = plt.gca().get_legend_handles_labels()
+
+    if save_png:
+        plt.savefig(output_name + '.png',
+                    dpi=300,
+                    facecolor="white",
+                    bbox_inches='tight',
+                    pad_inches=0.05,
+                    format='png')
+
+    plt.show()
+
+    # Create empty figure just for legend
+    fig_legend = plt.figure(figsize=(2, 1))  # tweak size as needed
+
+    fig_legend.legend(handles=handles,
+                    labels=labels,
+                    loc='center',
+                    frameon=False,  # No box around legend
+                    fontsize=calix_plot_setting['legend_font_size'])  # Optional: use your setting
+
+    fig_legend.gca().axis('off')
+
+    if save_png:
+        fig_legend.savefig(output_name + 'legend_only.png',
+                        bbox_inches='tight',
+                        transparent=True)
+
+    return
+
 def highlight_individual_scatter(pickle_file_folder,
                                  pickle_file_name,
                                  highlight_calix,
@@ -1366,6 +1487,96 @@ def report_various_test_split_results(test_split_dict):
     
     return
 
+def line_plot_various_test_split(test_split_results_dict,
+                                 calix_plot_setting,
+                                 networks_to_plot,
+                                 output_name,
+                                 plot_mode='abs',
+                                 save_png=False):
+    """
+    An alternative way of visualizing various test splits: line plots.
+
+    Results dictionaries are explicitly defined below, levels of organization in dicts
+    is network type --> absolute or relative training --> holdout amount --> raw or adjusted r2
+    """
+
+    # Set up the figure
+    plt.figure(figsize=(calix_plot_setting['fig_width'], calix_plot_setting['fig_height']))
+    plt.xlabel(calix_plot_setting['x_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.ylabel(calix_plot_setting['y_label'], fontsize=calix_plot_setting['axis_font_size'])
+    plt.xticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.yticks(fontsize=calix_plot_setting['tick_font_size'])
+    plt.title(calix_plot_setting['title'], fontsize=calix_plot_setting['title_font_size'])
+
+    # Create the line plot, with line type and marker type set in the plot_setting dict
+    for network_type in networks_to_plot:
+        x_pos = []
+        for holdout_amount in test_split_results_dict[network_type]['absolute']:
+            x_pos.append(float(holdout_amount))
+            if plot_mode == 'abs':
+                abs_current_r2 = test_split_results_dict[network_type]['absolute'][holdout_amount]['raw']
+                rel_current_r2 = test_split_results_dict[network_type]['relative'][holdout_amount]['raw']
+            else:
+                abs_current_r2 = test_split_results_dict[network_type]['absolute'][holdout_amount]['adj']
+                rel_current_r2 = test_split_results_dict[network_type]['relative'][holdout_amount]['adj']
+
+            # Extract the plot settings from calix_plot_setting
+            color = calix_plot_setting['marker_color'][network_type]
+            abs_shape = calix_plot_setting['marker_shape']['abs']
+            rel_shape = calix_plot_setting['marker_shape']['rel']
+            size = calix_plot_setting['marker_size']
+            opacity = calix_plot_setting['marker_opacity']
+            abs_line = calix_plot_setting['line_style']['abs']
+            rel_line = calix_plot_setting['line_style']['rel']
+            # Plot the current points
+            plt.plot((x_pos, abs_current_r2),
+                     color=color,
+                     marker=abs_shape,
+                     markersize=size,
+                     alpha=opacity,
+                     linestyle=abs_line,
+                     linewidth=1,
+                     label=network_type + ' ' + holdout_amount + ' absolute')
+            plt.plot((x_pos, rel_current_r2),
+                     color=color,
+                     marker=rel_shape,
+                     markersize=size,
+                     alpha=opacity,
+                     linestyle=rel_line,
+                     linewidth=1,
+                     label=network_type + ' ' + holdout_amount + ' relative')
+
+    # Get current legend info from main plot
+    handles, labels = plt.gca().get_legend_handles_labels()
+
+    if save_png:
+        plt.savefig(output_name + '.png',
+                    dpi=300,
+                    facecolor="white",
+                    bbox_inches='tight',
+                    pad_inches=0.05,
+                    format='png')
+
+    plt.show()
+
+    # Create empty figure just for legend
+    fig_legend = plt.figure(figsize=(2, 1))  # tweak size as needed
+
+    fig_legend.legend(handles=handles,
+                    labels=labels,
+                    loc='center',
+                    frameon=False,  # No box around legend
+                    fontsize=calix_plot_setting['legend_font_size'])  # Optional: use your setting
+
+    fig_legend.gca().axis('off')
+
+    if save_png:
+        fig_legend.savefig(output_name + 'legend_only.png',
+                        bbox_inches='tight',
+                        transparent=True)
+        
+    return
+
 calix_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
                         'x_label': 'Predicted (relative)',
@@ -1407,6 +1618,50 @@ lead_in_plot_setting = {'fig_width': 8,
 
 lead_in_calix_list = []
 
+holdout_plot_setting = {'fig_width': 8,
+                        'fig_height': 8,
+                        'x_label': 'Predicted',
+                        'y_label': 'Actual',
+                        'axis_font_size': 32,
+                        'tick_font_size': 24,
+                        'title_font_size': 40,
+                        'legend_font_size': 32,
+                        'title': 'AFP',
+                        'scatter_color': {'0.25': (0.727, 0.285, 0.152),
+                                          '0.50': (0.000, 0.578, 0.266),
+                                        '0.75': (0.398, 0.176, 0.566)},
+                        'scatter_shape': {'0.25': 'o',
+                                          '0.50': 'o',
+                                          '0.75': 'o'},
+                        'scatter_size': 25,
+                        'scatter_opacity': {'0.25': 0.5,
+                                            '0.50': 0.3,
+                                            '0.75': 0.1}}
+
+holdout_file_dict = {'0.25': '20 split 0.25 HO AFP relative.pkl',
+                     '0.50': '20 split 0.5 HO AFP relative.pkl',
+                     '0.75': '20 split 0.75 HO AFP relative.pkl'}
+
+holdout_line_setting = {'fig_width': 8,
+                        'fig_height': 8,
+                        'x_label': 'Predicted',
+                        'y_label': 'Actual',
+                        'axis_font_size': 32,
+                        'tick_font_size': 24,
+                        'title_font_size': 40,
+                        'legend_font_size': 32,
+                        'title': 'GCN',
+                        'marker_color': {'RF': (0.727, 0.285, 0.152),
+                                          'CNN': (0.000, 0.578, 0.266),
+                                        'AFP': (0.398, 0.176, 0.566)},
+                        'marker_shape': {'rel': 'x',
+                                         'abs': 'o'},
+                        'marker_size': 25,
+                        'marker_opacity': 0.75,
+                        'line_style': {'rel': '-',
+                                       'abs': '--'}}
+
+line_plot_include_list = ['RF', 'CNN', 'AFP']
 
 highlight_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
@@ -1497,6 +1752,93 @@ cnn_abs_dict = {'0.05': '20 split 0.05 HO CNN absolute.pkl',
                 '0.5': '20 split 0.5 HO CNN absolute.pkl',
                 '0.75': '20 split 0.75 HO CNN absolute.pkl'}
 
-
+rf_var_regress = {'absolute': {'0.04': {'raw': 0.57,
+                                        'adj': 0.87},
+                               '0.25': {'raw': 0.51,
+                                        'adj': 0.87},
+                               '0.50': {'raw': 0.36,
+                                        'adj': 0.87},
+                               '0.75': {'raw': 0.17,
+                                        'adj': 0.85}},
+                  'relative': {'0.04': {'raw': 0.44,
+                                        'adj': 0.89},
+                               '0.25': {'raw': 0.31,
+                                        'adj': 0.90},
+                               '0.50': {'raw': 0.20,
+                                         'adj': 0.89},
+                               '0.75': {'raw': 0.09,
+                                         'adj': 0.89}}}
         
+sv_var_regress = {'absolute': {'0.04': {'raw': 0.36,
+                                        'adj': 0.87},
+                               '0.25': {'raw': 0.25,
+                                        'adj': 0.86},
+                               '0.50': {'raw': 0.19,
+                                        'adj': 0.87},
+                               '0.75': {'raw': 0.13,
+                                        'adj': 0.87}},
+                  'relative': {'0.04': {'raw': 0.32,
+                                        'adj': 0.82},
+                               '0.25': {'raw': 0.15,
+                                        'adj': 0.81},
+                               '0.50': {'raw': 0.31,
+                                         'adj': 0.87},
+                               '0.75': {'raw': 0.16,
+                                         'adj': 0.86}}}
 
+cn_var_regress = {'absolute': {'0.04': {'raw': 0.32,
+                                        'adj': 0.83},
+                               '0.25': {'raw': -0.18,
+                                        'adj': 0.73},
+                               '0.50': {'raw': -0.09,
+                                        'adj': 0.72},
+                               '0.75': {'raw': -0.12,
+                                        'adj': 0.68}},
+                  'relative': {'0.04': {'raw': 0.46,
+                                        'adj': 0.88},
+                               '0.25': {'raw': 0.38,
+                                        'adj': 0.91},
+                               '0.50': {'raw': 0.24,
+                                         'adj': 0.90},
+                               '0.75': {'raw': 0.21,
+                                         'adj': 0.89}}}
+
+gc_var_regress = {'absolute': {'0.04': {'raw': 0.68,
+                                        'adj': 0.89},
+                               '0.25': {'raw': 0.36,
+                                        'adj': 0.90},
+                               '0.50': {'raw': 0.37,
+                                        'adj': 0.89},
+                               '0.75': {'raw': 0.28,
+                                        'adj': 0.85}},
+                  'relative': {'0.04': {'raw': 0.40,
+                                        'adj': 0.91},
+                               '0.25': {'raw': 0.41,
+                                        'adj': 0.80},
+                               '0.50': {'raw': 0.33,
+                                         'adj': 0.88},
+                               '0.75': {'raw': 0.16,
+                                         'adj': 0.86}}}
+
+af_var_regress = {'absolute': {'0.04': {'raw': 0.77,
+                                        'adj': 0.94},
+                               '0.25': {'raw': 0.44,
+                                        'adj': 0.90},
+                               '0.50': {'raw': 0.45,
+                                        'adj': 0.90},
+                               '0.75': {'raw': 0.22,
+                                        'adj': 0.86}},
+                  'relative': {'0.04': {'raw': 0.37,
+                                        'adj': 0.91},
+                               '0.25': {'raw': 0.25,
+                                        'adj': 0.85},
+                               '0.50': {'raw': 0.43,
+                                         'adj': 0.86},
+                               '0.75': {'raw': 0.01,
+                                         'adj': 0.83}}}
+
+regression_split_plot_dicts = {'RF': rf_var_regress,
+                               'SVM': sv_var_regress,
+                               'CNN': cn_var_regress,
+                               'GCN': gc_var_regress,
+                               'AFP': af_var_regress}
