@@ -1491,6 +1491,7 @@ def line_plot_various_test_split(test_split_results_dict,
                                  calix_plot_setting,
                                  networks_to_plot,
                                  output_name,
+                                 y_range=[0, 1],
                                  plot_mode='abs',
                                  save_png=False):
     """
@@ -1508,17 +1509,24 @@ def line_plot_various_test_split(test_split_results_dict,
     plt.yticks(fontsize=calix_plot_setting['tick_font_size'])
     plt.title(calix_plot_setting['title'], fontsize=calix_plot_setting['title_font_size'])
 
+    # Change tick direction if desired
+    plt.tick_params(axis='both',
+                    which='both',
+                    direction='in')
+
     # Create the line plot, with line type and marker type set in the plot_setting dict
     for network_type in networks_to_plot:
         x_pos = []
+        abs_r2s = []
+        rel_r2s = []
         for holdout_amount in test_split_results_dict[network_type]['absolute']:
-            x_pos.append(float(holdout_amount))
+            x_pos.append(holdout_amount * 100)
             if plot_mode == 'abs':
-                abs_current_r2 = test_split_results_dict[network_type]['absolute'][holdout_amount]['raw']
-                rel_current_r2 = test_split_results_dict[network_type]['relative'][holdout_amount]['raw']
+                abs_r2s.append(test_split_results_dict[network_type]['absolute'][holdout_amount]['raw'])
+                rel_r2s.append(test_split_results_dict[network_type]['relative'][holdout_amount]['raw'])
             else:
-                abs_current_r2 = test_split_results_dict[network_type]['absolute'][holdout_amount]['adj']
-                rel_current_r2 = test_split_results_dict[network_type]['relative'][holdout_amount]['adj']
+                abs_r2s.append(test_split_results_dict[network_type]['absolute'][holdout_amount]['adj'])
+                rel_r2s.append(test_split_results_dict[network_type]['relative'][holdout_amount]['adj'])
 
             # Extract the plot settings from calix_plot_setting
             color = calix_plot_setting['marker_color'][network_type]
@@ -1528,23 +1536,26 @@ def line_plot_various_test_split(test_split_results_dict,
             opacity = calix_plot_setting['marker_opacity']
             abs_line = calix_plot_setting['line_style']['abs']
             rel_line = calix_plot_setting['line_style']['rel']
-            # Plot the current points
-            plt.plot((x_pos, abs_current_r2),
-                     color=color,
-                     marker=abs_shape,
-                     markersize=size,
-                     alpha=opacity,
-                     linestyle=abs_line,
-                     linewidth=1,
-                     label=network_type + ' ' + holdout_amount + ' absolute')
-            plt.plot((x_pos, rel_current_r2),
-                     color=color,
-                     marker=rel_shape,
-                     markersize=size,
-                     alpha=opacity,
-                     linestyle=rel_line,
-                     linewidth=1,
-                     label=network_type + ' ' + holdout_amount + ' relative')
+        
+        # Adjust y-axis limits
+        plt.ylim(y_range[0], y_range[1])
+        # Plot the current points
+        plt.plot(x_pos,
+                    abs_r2s,
+                    color=color,
+                    marker=abs_shape,
+                    markersize=size,
+                    alpha=opacity,
+                    linestyle=abs_line,
+                    linewidth=2)
+        plt.plot(x_pos,
+                    rel_r2s,
+                    color=color,
+                    marker=rel_shape,
+                    markersize=size,
+                    alpha=opacity,
+                    linestyle=rel_line,
+                    linewidth=2)
 
     # Get current legend info from main plot
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1643,22 +1654,22 @@ holdout_file_dict = {'0.25': '20 split 0.25 HO AFP relative.pkl',
                      '0.75': '20 split 0.75 HO AFP relative.pkl'}
 
 holdout_line_setting = {'fig_width': 8,
-                        'fig_height': 8,
-                        'x_label': 'Predicted',
-                        'y_label': 'Actual',
+                        'fig_height': 4,
+                        'x_label': 'Holdout Amount (%)',
+                        'y_label': 'R2',
                         'axis_font_size': 32,
                         'tick_font_size': 24,
                         'title_font_size': 40,
                         'legend_font_size': 32,
-                        'title': 'GCN',
+                        'title': '',
                         'marker_color': {'RF': (0.727, 0.285, 0.152),
                                           'CNN': (0.000, 0.578, 0.266),
                                         'AFP': (0.398, 0.176, 0.566)},
-                        'marker_shape': {'rel': 'x',
+                        'marker_shape': {'rel': 'D',
                                          'abs': 'o'},
-                        'marker_size': 25,
-                        'marker_opacity': 0.75,
-                        'line_style': {'rel': '-',
+                        'marker_size': 15,
+                        'marker_opacity': 0.95,
+                        'line_style': {'rel': ':',
                                        'abs': '--'}}
 
 line_plot_include_list = ['RF', 'CNN', 'AFP']
@@ -1752,89 +1763,89 @@ cnn_abs_dict = {'0.05': '20 split 0.05 HO CNN absolute.pkl',
                 '0.5': '20 split 0.5 HO CNN absolute.pkl',
                 '0.75': '20 split 0.75 HO CNN absolute.pkl'}
 
-rf_var_regress = {'absolute': {'0.04': {'raw': 0.57,
+rf_var_regress = {'absolute': {0.04: {'raw': 0.57,
                                         'adj': 0.87},
-                               '0.25': {'raw': 0.51,
+                               0.25: {'raw': 0.51,
                                         'adj': 0.87},
-                               '0.50': {'raw': 0.36,
+                               0.50: {'raw': 0.36,
                                         'adj': 0.87},
-                               '0.75': {'raw': 0.17,
+                               0.75: {'raw': 0.17,
                                         'adj': 0.85}},
-                  'relative': {'0.04': {'raw': 0.44,
+                  'relative': {0.04: {'raw': 0.44,
                                         'adj': 0.89},
-                               '0.25': {'raw': 0.31,
+                               0.25: {'raw': 0.31,
                                         'adj': 0.90},
-                               '0.50': {'raw': 0.20,
+                               0.50: {'raw': 0.20,
                                          'adj': 0.89},
-                               '0.75': {'raw': 0.09,
+                               0.75: {'raw': 0.09,
                                          'adj': 0.89}}}
         
-sv_var_regress = {'absolute': {'0.04': {'raw': 0.36,
+sv_var_regress = {'absolute': {0.04: {'raw': 0.36,
                                         'adj': 0.87},
-                               '0.25': {'raw': 0.25,
+                               0.20: {'raw': 0.25,
                                         'adj': 0.86},
-                               '0.50': {'raw': 0.19,
+                               0.50: {'raw': 0.19,
                                         'adj': 0.87},
-                               '0.75': {'raw': 0.13,
+                               0.75: {'raw': 0.13,
                                         'adj': 0.87}},
-                  'relative': {'0.04': {'raw': 0.32,
+                  'relative': {0.04: {'raw': 0.32,
                                         'adj': 0.82},
-                               '0.25': {'raw': 0.15,
+                               0.25: {'raw': 0.15,
                                         'adj': 0.81},
-                               '0.50': {'raw': 0.31,
+                               0.50: {'raw': 0.31,
                                          'adj': 0.87},
-                               '0.75': {'raw': 0.16,
+                               0.75: {'raw': 0.16,
                                          'adj': 0.86}}}
 
-cn_var_regress = {'absolute': {'0.04': {'raw': 0.32,
+cn_var_regress = {'absolute': {0.04: {'raw': 0.32,
                                         'adj': 0.83},
-                               '0.25': {'raw': -0.18,
+                               0.25: {'raw': -0.18,
                                         'adj': 0.73},
-                               '0.50': {'raw': -0.09,
+                               0.50: {'raw': -0.09,
                                         'adj': 0.72},
-                               '0.75': {'raw': -0.12,
+                               0.75: {'raw': -0.12,
                                         'adj': 0.68}},
-                  'relative': {'0.04': {'raw': 0.46,
+                  'relative': {0.04: {'raw': 0.46,
                                         'adj': 0.88},
-                               '0.25': {'raw': 0.38,
+                               0.25: {'raw': 0.38,
                                         'adj': 0.91},
-                               '0.50': {'raw': 0.24,
+                               0.50: {'raw': 0.24,
                                          'adj': 0.90},
-                               '0.75': {'raw': 0.21,
+                               0.75: {'raw': 0.21,
                                          'adj': 0.89}}}
 
-gc_var_regress = {'absolute': {'0.04': {'raw': 0.68,
+gc_var_regress = {'absolute': {0.04: {'raw': 0.68,
                                         'adj': 0.89},
-                               '0.25': {'raw': 0.36,
+                               0.25: {'raw': 0.36,
                                         'adj': 0.90},
-                               '0.50': {'raw': 0.37,
+                               0.50: {'raw': 0.37,
                                         'adj': 0.89},
-                               '0.75': {'raw': 0.28,
+                               0.75: {'raw': 0.28,
                                         'adj': 0.85}},
-                  'relative': {'0.04': {'raw': 0.40,
+                  'relative': {0.04: {'raw': 0.40,
                                         'adj': 0.91},
-                               '0.25': {'raw': 0.41,
+                               0.25: {'raw': 0.41,
                                         'adj': 0.80},
-                               '0.50': {'raw': 0.33,
+                               0.50: {'raw': 0.33,
                                          'adj': 0.88},
-                               '0.75': {'raw': 0.16,
+                               0.75: {'raw': 0.16,
                                          'adj': 0.86}}}
 
-af_var_regress = {'absolute': {'0.04': {'raw': 0.77,
+af_var_regress = {'absolute': {0.04: {'raw': 0.77,
                                         'adj': 0.94},
-                               '0.25': {'raw': 0.44,
+                               0.25: {'raw': 0.44,
                                         'adj': 0.90},
-                               '0.50': {'raw': 0.45,
+                               0.50: {'raw': 0.45,
                                         'adj': 0.90},
-                               '0.75': {'raw': 0.22,
+                               0.75: {'raw': 0.22,
                                         'adj': 0.86}},
-                  'relative': {'0.04': {'raw': 0.37,
+                  'relative': {0.04: {'raw': 0.37,
                                         'adj': 0.91},
-                               '0.25': {'raw': 0.25,
+                               0.25: {'raw': 0.25,
                                         'adj': 0.85},
-                               '0.50': {'raw': 0.43,
+                               0.50: {'raw': 0.43,
                                          'adj': 0.86},
-                               '0.75': {'raw': 0.01,
+                               0.75: {'raw': 0.01,
                                          'adj': 0.83}}}
 
 regression_split_plot_dicts = {'RF': rf_var_regress,
