@@ -1157,12 +1157,12 @@ def highlight_individual_scatter(pickle_file_folder,
     handles, labels = plt.gca().get_legend_handles_labels()
 
     if save_png:
-        plt.savefig(output_name + '.svg',
+        plt.savefig(output_name + '.png',
                     dpi=300,
                     facecolor="white",
                     bbox_inches='tight',
                     pad_inches=0.05,
-                    format='svg')
+                    format='png')
 
     plt.show()
 
@@ -1178,7 +1178,7 @@ def highlight_individual_scatter(pickle_file_folder,
     fig_legend.gca().axis('off')
 
     if save_png:
-        fig_legend.savefig(output_name + 'legend_only.svg',
+        fig_legend.savefig(output_name + 'legend_only.png',
                         bbox_inches='tight',
                         transparent=True)
 
@@ -1612,22 +1612,22 @@ lead_in_plot_setting = {'fig_width': 8,
                         'tick_font_size': 24,
                         'title_font_size': 40,
                         'legend_font_size': 32,
-                        'title': 'GCN',
-                        'scatter_color': {'AO3': (0.727, 0.285, 0.152), 
-                                        'AM1': (0.000, 0.578, 0.266),
-                                        'CP2': (0.398, 0.176, 0.566),
+                        'title': 'CNN',
+                        'scatter_color': {'AM1': (0.727, 0.285, 0.152),
+                                          'AH5': (0.98, 0.69, 0.25), 
+                                        'E11': (0.398, 0.176, 0.566),
                                         'All Others': (0.055, 0.297, 0.344)},
-                        'scatter_shape': {'AO3': 'o',
-                                          'AM1': 'o',
-                                          'CP2': 'o',
+                        'scatter_shape': {'AM1': 'o',
+                                          'AH5': 'o',
+                                          'E11': 'o',
                                           'All Others': 'o'},
                         'scatter_size': 75,
-                        'scatter_opacity': {'AO3': 0.95,
-                                            'AM1': 0.95,
-                                            'CP2': 0.95,
-                                            'All Others': 0.5}}
+                        'scatter_opacity': {'AM1': 0.95,
+                                            'AH5': 0.95,
+                                            'E11': 0.95,
+                                            'All Others': 0.25}}
 
-lead_in_calix_list = []
+lead_in_calix_list = ['AM1', 'AH5', 'E11',]
 
 holdout_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
