@@ -861,13 +861,14 @@ def scatter_by_network_class(pickle_file_folder,
         unpred_color = calix_plot_setting['scatter_color'][specific_file]['Unpredictable']
         unpred_shape = calix_plot_setting['scatter_shape'][specific_file]['Unpredictable']
         size = calix_plot_setting['scatter_size']
-        opacity = calix_plot_setting['scatter_opacity']
+        pred_opacity = calix_plot_setting['scatter_opacity'][specific_file]['Predictable']
+        unpred_opacity = calix_plot_setting['scatter_opacity'][specific_file]['Unpredictable']
         # Plot the predictable points
         plt.scatter(predictable_pred_val,
                     predictable_act_val,
                     color=pred_color,
                     s=size,
-                    alpha=opacity,
+                    alpha=pred_opacity,
                     marker=pred_shape,
                     label=specific_file + ' Predictable')
         # Try unpredicable; sometimes must be skipped for filtered datasets
@@ -878,7 +879,7 @@ def scatter_by_network_class(pickle_file_folder,
                         unpredictable_act_val,
                         color=unpred_color,
                         s=size,
-                        alpha=opacity,
+                        alpha=unpred_opacity,
                         marker=unpred_shape,
                         label=specific_file + ' Unpredictable')
             print('R2 value for "unpredictable" points is:', str(r2_score(unpredictable_act_val, unpredictable_pred_val)))
@@ -1596,13 +1597,20 @@ calix_plot_setting = {'fig_width': 8,
                         'tick_font_size': 24,
                         'title_font_size': 40,
                         'legend_font_size': 32,
-                        'title': 'AttentiveFP',
-                        'scatter_color': {'AttentiveFP': {'Unpredictable': (0.055, 0.297, 0.344),
-                                                          'Predictable': (0.727, 0.285, 0.152)}},
-                        'scatter_shape': {'AttentiveFP': {'Predictable': 'o',
-                                                          'Unpredictable': 'x'}},
+                        'title': 'AFP Abs vs Relative',
+                        'scatter_color': {'AFP ABS': {'Predictable': (0.055, 0.297, 0.344),
+                                                      'Unpredictable': (0.055, 0.297, 0.344)},
+                                          'AFP REL': {'Predictable': (0.73, 0.29, 0.15),
+                                                        'Unpredictable': (0.73, 0.29, 0.15)}},
+                        'scatter_shape': {'AFP ABS': {'Predictable': 'o',
+                                                      'Unpredictable': 'o'},
+                                          'AFP REL': {'Predictable': 'D',
+                                                      'Unpredictable': 'D'}},
                         'scatter_size': 75,
-                        'scatter_opacity': 0.5}
+                        'scatter_opacity': {'AFP ABS': {'Predictable': 0.4,
+                                                        'Unpredictable': 0.4},
+                                            'AFP REL': {'Predictable': 0.6,
+                                                        'Unpredictable': 0.6}}}
 
 lead_in_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
@@ -1612,7 +1620,7 @@ lead_in_plot_setting = {'fig_width': 8,
                         'tick_font_size': 24,
                         'title_font_size': 40,
                         'legend_font_size': 32,
-                        'title': 'CNN',
+                        'title': 'AFP',
                         'scatter_color': {'AM1': (0.727, 0.285, 0.152),
                                           'AH5': (0.98, 0.69, 0.25), 
                                         'E11': (0.398, 0.176, 0.566),
@@ -1625,9 +1633,9 @@ lead_in_plot_setting = {'fig_width': 8,
                         'scatter_opacity': {'AM1': 0.95,
                                             'AH5': 0.95,
                                             'E11': 0.95,
-                                            'All Others': 0.25}}
+                                            'All Others': 0.5}}
 
-lead_in_calix_list = ['AM1', 'AH5', 'E11',]
+lead_in_calix_list = []
 
 holdout_plot_setting = {'fig_width': 8,
                         'fig_height': 8,
@@ -1654,7 +1662,7 @@ holdout_file_dict = {'0.25': '20 split 0.25 HO AFP relative.pkl',
                      '0.75': '20 split 0.75 HO AFP relative.pkl'}
 
 holdout_line_setting = {'fig_width': 8,
-                        'fig_height': 4,
+                        'fig_height': 2.5,
                         'x_label': 'Holdout Amount (%)',
                         'y_label': 'R2',
                         'axis_font_size': 32,
@@ -1849,7 +1857,7 @@ af_var_regress = {'absolute': {0.04: {'raw': 0.77,
                                          'adj': 0.83}}}
 
 regression_split_plot_dicts = {'RF': rf_var_regress,
-                               'SVM': sv_var_regress,
+                            #    'SVM': sv_var_regress,
                                'CNN': cn_var_regress,
-                               'GCN': gc_var_regress,
+                            #    'GCN': gc_var_regress,
                                'AFP': af_var_regress}
