@@ -1,0 +1,68 @@
+# ---------- Core (safe) ----------
+# OS
+.DS_Store
+Icon?
+Thumbs.db
+
+# Editors/IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Python bytecode and build artifacts
+**/__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.eggs/
+*.egg-info/
+dist/
+build/
+wheels/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing / type-check / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.pytype/
+
+# Logs
+*.log
+
+# Cloud sync (Dropbox)
+.dropbox
+.dropbox.attr
+.dropbox.cache/
+
+# ---------- Project-specific (generated/large) ----------
+# Plots and experiment artifacts
+Visualization/**/*.png
+Hyperparam Search/**/*.png
+Hyperparam Search/**/*.txt
+
+# Model checkpoints and derived results
+GraphNET/code/saved_models/**/*.pt
+GraphNET/Result_dicts/**/*.pkl
+Results Dictionaries/**/*.pkl
+
+# Intermediate/serialized data (Parquet/Pickle) — ignore if reproducible
+PQFiles/**/*.pq
+**/*.pickle
+# If most .pkl are reproducible, you can also ignore all pickles:
+# **/*.pkl
+
+# Large spreadsheets (often data exports) — ignore if generated from source
+**/*.xlsx
