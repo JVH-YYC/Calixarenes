@@ -304,7 +304,6 @@ def perform_svm_grid_search(svm_data,
 
     # Fit the model using the 'train' split
     grid_search.fit(svm_data['train']['features'], svm_data['train']['target'])
-    print(svm_data['train']['target'])
     # Predict on the 'test' split and compute MSE
     best_svm = grid_search.best_estimator_
     predictions_test = best_svm.predict(svm_data['test']['features'])
@@ -391,7 +390,7 @@ def loo_random_forest_final(calixarene_csv_folder,
     Saves predicted/actual results in a dictionary of the typical format, and pickles it for future plotting/processing.
 
     Results from 10-fold-CV hyperparameter search:
-    Best = Bootstrap Tue, Max_depth 10, min_samples_leaf 4, min_samples_split 2, n_estimators 100
+    Best = Bootstrap True, Max_depth 10, min_samples_leaf 4, min_samples_split 2, n_estimators 100
     Worst = Bootstrap False, Max_depth 50, min_samples_leaf 1, min_samples_split 2, n_estimators 10
 
     """

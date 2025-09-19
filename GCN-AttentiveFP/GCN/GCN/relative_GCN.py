@@ -8,7 +8,7 @@ class RelativeGCNModel(nn.Module):
         super(RelativeGCNModel, self).__init__()
         
         self.radius = radius
-        self.T = T
+        self.T = T # This value is not used in the GCN so does not matter. 
         
         # Increase the dimensionality of hidden layers
         hidden_dim = fingerprint_dim * 4  # Significantly larger hidden dimension

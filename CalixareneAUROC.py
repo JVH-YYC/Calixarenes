@@ -95,16 +95,7 @@ def is_multi_target_format(data):
            len(data[0]) == 2 and \
            all(isinstance(elem, np.ndarray) and elem.shape[0] == 8 for elem in data[0])
 
-def reshape_multi_target_data(data):
-    """
-    Reshape data from multi-target tuples to a dictionary format compatible with the plotting function.
 
-    Parameters:
-    data (list of tuples): Each tuple contains two numpy arrays (true labels, predicted probabilities)
-    
-    Returns:
-    dict: Dictionary with keys as target labels and values as lists of tuples (class label, probability)
-    """
 def reshape_multi_target_data(data):
     """
     Reshape data from multi-target tuples to a single list of tuples format.
