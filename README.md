@@ -74,51 +74,7 @@ The project uses experimental binding data for **39 calixarene molecules** again
 - **Visualization**: Predicted vs actual plots, ROC curves
 - **Statistical analysis**: Cross-validation results
 
-## Usage Examples
-
-### Traditional ML with Random Forest
-```python
-from SKLearnBenchmarks import loo_random_forest_final
-
-# Leave-one-out cross-validation
-results = loo_random_forest_final(
-    calixarene_csv_folder='Featurization/',
-    calixarene_csv_name='calix smiles absolute.csv',
-    peptide_one_hot_encoding='one_hot_short.csv',
-    calixarene_list=calixarene_list,
-    output_name='RF_results.pkl',
-    relative_training=False
-)
-```
-
-### CNN Training
-```python
-from ResNet.CalixNet import cnn_training_split_workflow
-
-# Train ResNet model
-cnn_training_split_workflow(
-    pq_file_directory='PQFiles/',
-    pq_file_name='AlokThesis10A_Comb.pq',
-    csv_file_directory='CSVFiles/',
-    binding_file='Data excluding non-binders.csv',
-    one_hot_file='one_hot_short.csv',
-    split_calixarene_dict=split_dict,
-    holdout_size=0.2,
-    batch_size=400,
-    training_epochs=400
-)
-```
-
-### Data Visualization
-```python
-from CalixareneRegression import created_predicted_actual_regression_plot
-from CalixareneAUROC import plot_multiple_auc_roc
-
-# Plot regression results
-created_predicted_actual_regression_plot(results_dict)
-
-# Plot classification results  
-plot_multiple_auc_roc(classification_results)
+ultiple_auc_roc(classification_results)
 ```
 
 ## Dependencies
