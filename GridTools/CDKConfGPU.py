@@ -210,7 +210,7 @@ def gen_min_confs(molecule,
     ase.Atoms object that has .get_positions() function for coordinates)
 
     """    
-    AllChem.EmbedMultipleConfs(molecule, pruneRmsThresh=0.1, numConfs=num_conformers)
+    AllChem.EmbedMultipleConfs(molecule, pruneRmsThresh=0.2, numConfs=num_conformers)
     rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(molecule, maxIters=1250)
     return_list = []
     for conformer in molecule.GetConformers():
