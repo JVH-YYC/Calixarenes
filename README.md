@@ -1,6 +1,6 @@
 ## Dataset
 
-The project uses experimental binding data for **39 calixarene molecules** against **8 histone peptides**:
+The project uses experimental binding data for **38 calixarene molecules** against **8 histone peptides**:
 
 ### Calixarene Families
 - **Core A**: AP1-AP9, AM1-AM2, AH1-AH7, AO1-AO3
