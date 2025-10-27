@@ -31,6 +31,20 @@ def create_ecfp_dictionary(calixarene_csv_folder,
     If each peptide is being measured individually, then 'Target' is included.
     
     target_columns_per_example has 2 values: 'each' or 'all'.
+
+    Parameters
+    ----------
+    calixarene_csv_folder : string
+        Self-evident - name of folder containing calixarene CSV file
+    calixarene_csv_file : string
+        Self-evident - name of file containing calixarene CSV file
+    target_columns : list of strings
+        If only certain peptides will be evaluated, this list will match the target columns in the adsorption .csv
+        file - aka peptide names (H3K4, etc.)
+    target_columns_per_example: string ('each' or 'all')
+        Determines whether 'all' peptide targets for a host will be partitioned into the same training/test set, or whether
+        'each' data point can be moved individually. From the point of view of someone trying to make new calixarenes, 'all'
+        is the correct choice. An entire calixarene needs to be held out for testing, not just a single point.
     """
 
     # Read in the .csv file
@@ -68,6 +82,19 @@ def create_structured_ecfp_dictionary(calixarene_csv_folder,
     to be 'predictable' (mono and unsubstituted) and 'unpredictable' (multiple substituents)
 
     We only care about predictions for 'predictable' systems, so we exclude the 'unpredictable' systems from the test set.
+
+    Parameters
+    ----------
+    calixarene_csv_folder : string
+        Self-evident - name of folder containing calixarene CSV file
+    calixarene_csv_file : string
+        Self-evident - name of file containing calixarene CSV file
+    split_calixarene_dict: dictionary
+        Dict with keys of 'predictable' and 'unpredictable': the lab-generated dataset is quite unevenly split between
+        mono- or unsubstituted calixarenes (e.g. P, A, E-type) vs multi-substituted (B, C, D), so in some analyses these
+        are considered separately.
+    holdout_size : float
+        Determines size of training/test split as one additional evaluation    
     """
 
     # Read in the .csv file
@@ -115,6 +142,8 @@ def create_structured_relative_ecfp_dictionary(calixarene_csv_folder,
 
     To this dict, add 'test calix' as a key, with the list of selected calixarenes for testing. Unlike in absolute training,
     it's not immediately obvious which calix is being tested.
+
+    Parameters are identical to that above.
     """
 
     # Read in the .csv file
@@ -175,6 +204,8 @@ def create_structured_absolute_ecfp_dictionary(calixarene_csv_folder,
     A complementary function to that above, but for absolute training/prediction rather than relative
 
     Add held-out calixarene names to the dictionary for later use
+
+    Over time, this evolved into a duplicate of the function 2 above.
     """
 
     # Read in the .csv file
@@ -410,7 +441,8 @@ def cross_validation_split_calix_dataset(calixarene_dict,
     
     The split can occur 2 different ways:
         'by_point': in this case all points are treated eqally and split by random shuffle
-        'by_host': in this case, all points with a given host are in either the train, test, or validation set"""
+        'by_host': in this case, all points with a given host are in either the train, test, or validation set
+    """
 
     # Create a dictionary to hold the split data
     calixarene_cv_dict = {}
@@ -512,7 +544,22 @@ def organize_random_forest_input(split_calix_dataset,
     selecting some of features out of a larger library and crafting them into objects
     of the appropriate shape to pass to scikit learn RF regressor
     
-    Calculate and create the target values at the same time to keep things aligned"""
+    Calculate and create the target values at the same time to keep things aligned
+    
+    Parameters
+    ----------
+    split_calix_dataset: dictionary
+        For any of the several above functions, a dictionary of training/test examples is created - that becomes input here
+    dataset_target_type: string ('all' or 'each')
+        Identical to that above: dataset dictionaries are created in 'all' or 'each' mode, must be consistent here.
+    ordered_feature_list: list of ECFP6 fingerprint created above 
+        ECFP6 fingerprint that is concatenated w/ peptide information here to craft a random forest input
+    peptide_one_hot_encoding: dictionary
+        A dictionary that contains peptide names as keys, and points to one-hot-encoded vectories of their properties
+
+    """
+
+
 
     # Create a dictionary to hold the data
     calixarene_rf_dict = {}
@@ -570,6 +617,17 @@ def organize_loo_model_input(loo_calix_dataset,
     Therefore, there is no 'validation' split, and the data is always split by 'host', and each point is treated individually.
 
     Also, the only ordered feature for the final investigation is 'EFCP', so the ordered_feature_list is removed.
+
+    Parameters
+    ----------
+    loo_calix_dataset: dictionary
+        A training/test example dictionary created by one of LOO creation functions above
+    one_hot_encoding_folder : string
+        A string that points to the folder holding one hot encoding CSV
+    peptide_one_hot_encoding : string
+        Actual file name for the one-hot encoding CSV
+    relative_training : Boolean
+        Indicates whether training type is relative (True) or absolute (False)
     """
     # Open one-hot encodings as dataframe
     one_hot_df = pd.read_csv(one_hot_encoding_folder + peptide_one_hot_encoding, index_col='Peptide')

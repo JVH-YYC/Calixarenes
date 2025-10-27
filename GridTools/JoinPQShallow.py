@@ -259,4 +259,4 @@ def drop_calixarenes(pop_file_name,
     
     return
 
-pq_shell('50C_Boltz2_Iso_')
+# pq_shell('50C_Boltz2_Iso_')

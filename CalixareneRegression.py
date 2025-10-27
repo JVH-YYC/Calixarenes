@@ -10,7 +10,8 @@ from scipy.stats import linregress
 def load_single_regression_pickle(pickle_file_directory,
                                       pickle_file_name):
     """
-    Docstring
+    Simple, open pickle file
+    Parameters self-evident
     """
 
     pickle_file = pickle_file_directory + pickle_file_name
@@ -23,7 +24,8 @@ def combine_regression_pickles(list_of_pickle_directories,
                                    list_of_pickle_file_names,
                                    target_split):
     """
-    Docstring
+    Combines multiple files - first two parameters are self-evident
+    'target_split' refers to whether training or test splits should be loaded/combined
     """
 
     combined_data = []
@@ -40,7 +42,11 @@ def create_dict_of_regression_pickles(list_of_list_of_pickle_directories,
                                           list_of_plot_labels,
                                           target_split):
         """
-        Docstring
+        Next level up in heirarchy
+        For comparing different approaches.
+        The 'list_of_plot_labels' could be different splits, different models, etc.
+        Each of the saved data for the different splits/models/etc. needs to be ordered in the
+        same way for the list_of_lists
         """
     
         combined_data = {}
@@ -57,7 +63,7 @@ def create_dict_of_mixed_regression_pickles(list_of_list_of_pickle_directories,
                                           list_of_plot_labels,
                                           target_split):
     """
-    Docstring
+    Same as function directly above, flexible handling of multi target data
     """
 
     combined_data = {}

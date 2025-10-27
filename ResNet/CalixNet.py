@@ -962,44 +962,12 @@ def batch_work_flow(file_name_variable,
     """
     Batch training of networks to allow for hyperparameter searching and plotting of results
 
-    Parameters
+    Parameters (mentioned above multiple times)
     ----------
-    file_name_variable : TYPE
-        DESCRIPTION.
-    pq_file_directory : TYPE
-        DESCRIPTION.
-    file_name_list : TYPE
-        DESCRIPTION.
-    csv_file_directory : TYPE
-        DESCRIPTION.
-    onehot_file : TYPE
-        DESCRIPTION.
-    binding_file : TYPE
-        DESCRIPTION.
-    validation_set : TYPE
-        DESCRIPTION.
-    output_name : TYPE
-        DESCRIPTION.
-    batch_size_variable : TYPE
-        DESCRIPTION.
-    batch_size_list : TYPE
-        DESCRIPTION.
-    filter_list_variable : TYPE
-        DESCRIPTION.
-    filter_list : TYPE
-        DESCRIPTION.
-    test_split : TYPE
-        DESCRIPTION.
-    training_epochs : TYPE
-        DESCRIPTION.
-    learn_rate_variable : TYPE
-        DESCRIPTION.
-    learn_rate_list : TYPE
-        DESCRIPTION.
 
     Returns
     -------
-    None.
+    None, but plots/saves on fly.
 
     """
 

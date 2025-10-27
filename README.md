@@ -24,7 +24,7 @@ The project uses experimental binding data for **39 calixarene molecules** again
 
 ### 2. Convolutional Neural Networks (`ResNet/`)
 - **3D ResNet architecture** for processing molecular grids
-- Processes **3D molecular representations** (48×48×48 grids)
+- Processes **3D molecular representations** 
 - Supports both **absolute** and **relative** binding predictions
 - Uses **PyTorch** with GPU acceleration
 
@@ -70,11 +70,10 @@ The project uses experimental binding data for **39 calixarene molecules** again
 
 ### Model Evaluation
 - **Regression metrics**: MSE, R², correlation coefficients
-- **Classification metrics**: AUROC, precision, recall
-- **Visualization**: Predicted vs actual plots, ROC curves
+- **Visualization**: Predicted vs actual plots
 - **Statistical analysis**: Cross-validation results
 
-ultiple_auc_roc(classification_results)
+
 ```
 
 ## Dependencies
@@ -95,10 +94,8 @@ ultiple_auc_roc(classification_results)
 ## Results Summary
 
 The project demonstrates that:
-1. **Traditional ML** (Random Forest, SVM) with ECFP fingerprints provides strong baseline performance
-2. **Deep learning** approaches (CNN, GNN) can capture more complex molecular interactions
-3. **Relative binding** predictions often outperform absolute predictions
-4. **Leave-one-out** validation provides robust performance estimates
+1. **Traditional ML** (Random Forest, SVM) with ECFP fingerprints can provide useful baseline performance for new entrants
+2. **Deep learning** approaches (GNN, especially with AttentiveFP) can capture more complex molecular interactions
 
 ## File Descriptions
 
@@ -106,7 +103,6 @@ The project demonstrates that:
 - `SKLearnBenchmarks.py` - Traditional ML implementations
 - `ResNetTrain.py` - CNN training pipeline
 - `CalixareneRegression.py` - Regression analysis and plotting
-- `CalixareneAUROC.py` - Classification analysis and ROC curves
 - `GridPopThesis.py` - 3D grid generation pipeline
 
 ### Data Files

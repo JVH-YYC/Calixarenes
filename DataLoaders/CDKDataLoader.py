@@ -122,20 +122,25 @@ def labelled_example_generator(calix_1,
     A 'difference' frame for the given calixarene pair
 
     """
+    #Old CHEM599 U/D indicators
+    #first_random = random.getrandbits(1)
     
-    first_random = random.getrandbits(1)
-    
-    if first_random == 0:
-        this_pass_1 = 'U'
-    else:
-        this_pass_1 = 'D'
+    #if first_random == 0:
+    #    this_pass_1 = 'U'
+    #else:
+    #    this_pass_1 = 'D'
     
     #Create calixarene 1 dataframe
 
-    cal_1_aso = calix_1 + '_' + this_pass_1 + '_ASO'
-    cal_1_pos = calix_1 + '_' + this_pass_1 + '_POS'
-    cal_1_neg = calix_1 + '_' + this_pass_1 + '_NEG'
-    cal_1_pol = calix_1 + '_' + this_pass_1 + '_POL'
+    # cal_1_aso = calix_1 + '_' + this_pass_1 + '_ASO'
+    # cal_1_pos = calix_1 + '_' + this_pass_1 + '_POS'
+    # cal_1_neg = calix_1 + '_' + this_pass_1 + '_NEG'
+    # cal_1_pol = calix_1 + '_' + this_pass_1 + '_POL'
+
+    cal_1_aso = calix_1 + '_ASO'
+    cal_1_pos = calix_1 + '_POS'
+    cal_1_neg = calix_1 + '_NEG'
+    cal_1_pol = calix_1 + '_POL'
 
     calix_1_frame = pd.DataFrame({'x': data_frame['x'],
                                   'y': data_frame['y'],
@@ -145,18 +150,23 @@ def labelled_example_generator(calix_1,
                                   'NEG': data_frame[cal_1_neg],
                                   'POL': data_frame[cal_1_pol]})
     
-    sec_random = random.getrandbits(1)
+    # sec_random = random.getrandbits(1)
     
-    if sec_random == 0:
-        this_pass_2 = 'U'
-    else:
-        this_pass_2 = 'D'
+    # if sec_random == 0:
+    #     this_pass_2 = 'U'
+    # else:
+    #     this_pass_2 = 'D'
         
     #Get calixarene 2 names
-    cal_2_aso = calix_2 + '_' + this_pass_2 + '_ASO'
-    cal_2_pos = calix_2 + '_' + this_pass_2 + '_POS'
-    cal_2_neg = calix_2 + '_' + this_pass_2 + '_NEG'
-    cal_2_pol = calix_2 + '_' + this_pass_2 + '_POL'
+    # cal_2_aso = calix_2 + '_' + this_pass_2 + '_ASO'
+    # cal_2_pos = calix_2 + '_' + this_pass_2 + '_POS'
+    # cal_2_neg = calix_2 + '_' + this_pass_2 + '_NEG'
+    # cal_2_pol = calix_2 + '_' + this_pass_2 + '_POL'
+
+    cal_2_aso = calix_2 + '_ASO'
+    cal_2_pos = calix_2 + '_POS'
+    cal_2_neg = calix_2 + '_NEG'
+    cal_2_pol = calix_2 + '_POL'
 
     #Create difference frame
     calix_1_frame['ASO'] -= data_frame[cal_2_aso]
@@ -341,12 +351,12 @@ def key_to_tensor(inverse_flag,
 
     Parameters
     ----------
-    inverse_flag : TYPE
-        DESCRIPTION.
-    calix_tuple : TYPE
-        DESCRIPTION.
-    data_frame : TYPE
-        DESCRIPTION.
+    inverse_flag : Boolean
+        Makes sure that calix_1/calix_2 and calix_2/calix_1 values are both trained & tested
+    calix_tuple : tuple
+        A description of the calixarene pair being investigated, e.g. ('AP1', 'AO3')
+    data_frame : pandas DataFrame
+        Single (huge) DataFrame that comes from 3D voxelization of ASO, POS, NEG, POL
 
     Returns
     -------
@@ -376,6 +386,7 @@ def create_tensor_dict(calixarene_list, data_frame):
     rather than creating a fresh tensor for each example (old approach).
 
     Aug 2024 dataset no longer has multiple starts on grid population, so don't need to append '_1' to all calixarenes
+    Not CHEM599 project, so no '_U', or '_D' labels for small molecules
     """
     tensor_dict = {}
 

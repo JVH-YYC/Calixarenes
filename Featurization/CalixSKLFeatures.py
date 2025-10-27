@@ -12,7 +12,13 @@ def create_ecfp6_fingerprint(smiles_string):
     Create the ECFP6 fingerprint for a given smiles string
     
     Converted into a numpy array for flexibility
+    
+    Parameters
+    ----------
+    smiles_string : SMILES string
+        Self-explanatory, needed to create molecule in RDKit
     """
+    
     mol = Chem.MolFromSmiles(smiles_string)
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=3)
     ecfp = np.array(fp)
@@ -24,6 +30,13 @@ def create_double_ecpf6_fingerprint(smiles_tuple,
     """
     Takes a tuple with two SMILES strings and returns a concatenated ECFP6 fingerprint if the mode is 'concat',
     or returns a difference of the two fingerprints if the mode is 'diff'
+
+    Parameters
+    ----------
+    smiles_tuple : tuple
+        A tuple of two smiles strings
+    method : string ('concat' or 'diff')
+        Indicates whether the 2 ECFP6 fingerprints created should be concatenated, or whether a difference should be calculated
     """
     
     mol1 = Chem.MolFromSmiles(smiles_tuple[0])

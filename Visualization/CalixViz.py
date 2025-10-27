@@ -699,7 +699,7 @@ def calix_heatmap_from_csv(csv_folder,
                            output_file_type,
                            heatmap_dict):
     """
-    Docstring
+    Standard heatmap based on adsorption CSV file
     """
     # Read in the csv file
     csv_file = os.path.join(csv_folder, csv_file_name)
